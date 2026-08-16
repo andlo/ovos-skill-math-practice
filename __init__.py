@@ -138,6 +138,13 @@ OPERATION_ALIASES = _load_operation_aliases_from_disk()
 
 class MathPractice(OVOSSkill):
 
+    def initialize(self):
+        # Session-only, not persisted across restarts - see README
+        # "Shared pattern: teach-then-practice" for why (deliberately
+        # simple for v1, tracked as a possible future upgrade rather
+        # than built speculatively).
+        self._taught_facts = []
+
     def _speak_number_not_understood(self):
         self.speak_dialog("number_not_understood")
 
@@ -209,21 +216,43 @@ class MathPractice(OVOSSkill):
         returns the transcribed text, or None on timeout/no response."""
         return self.get_response(dialog=f"quiz_question_{operation}", data={"a": a, "b": b})
 
+    def _ask_and_grade(self, operation, a, b, answer):
+        """Asks one question and speaks correct/incorrect feedback.
+        Returns True if the answer was correct, False otherwise
+        (including no-response). Shared by _run_quiz() (fresh random
+        problems) and _run_quiz_from_facts() (a fixed, previously-
+        taught set) so both go through identical grading logic."""
+        response_text = self._ask_question(operation, a, b)
+        if response_text is None:
+            self.speak_dialog("quiz_no_answer")
+            return False
+        user_value = extract_number(response_text, lang=self.lang)
+        if user_value is not False and user_value == answer:
+            self.speak_dialog("quiz_correct")
+            return True
+        self.speak_dialog("quiz_incorrect", {"answer": answer})
+        return False
+
     def _run_quiz(self, operation, table=None):
         correct_count = 0
         for _ in range(NUM_QUIZ_QUESTIONS):
             a, b, answer = generate_problem(operation, table)
-            response_text = self._ask_question(operation, a, b)
-            if response_text is None:
-                self.speak_dialog("quiz_no_answer")
-                continue
-            user_value = extract_number(response_text, lang=self.lang)
-            if user_value is not False and user_value == answer:
+            if self._ask_and_grade(operation, a, b, answer):
                 correct_count += 1
-                self.speak_dialog("quiz_correct")
-            else:
-                self.speak_dialog("quiz_incorrect", {"answer": answer})
         self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
+
+    def _run_quiz_from_facts(self, facts, operation="multiply"):
+        """Quizzes on a FIXED set of previously-taught facts, rather
+        than freshly generating random problems - the 'practice what
+        you were taught' half of the teach-then-practice pattern (see
+        README). Reuses the exact same per-question grading as
+        _run_quiz() via _ask_and_grade()."""
+        correct_count = 0
+        total = len(facts)
+        for a, b, answer in facts:
+            if self._ask_and_grade(operation, a, b, answer):
+                correct_count += 1
+        self.speak_dialog("quiz_finished", {"correct": correct_count, "total": total})
 
     @intent_handler("quiz_table.intent")
     def handle_quiz_table(self, message):
@@ -247,3 +276,42 @@ class MathPractice(OVOSSkill):
     @intent_handler("quiz_general.intent")
     def handle_quiz_general(self, message):
         self._run_quiz(random.choice(OPERATIONS))
+
+    # ------------------------------------------------------------------
+    # Teach-then-practice (see README "Shared pattern: teach-then-
+    # practice" and the tracked design issue for the full rationale
+    # and open questions)
+    # ------------------------------------------------------------------
+
+    @intent_handler("teach_me.intent")
+    def handle_teach_me(self, message):
+        n_raw = message.data.get("number")
+        n = extract_number(n_raw, lang=self.lang) if n_raw else None
+        if n is False or n is None or n < 1:
+            self._speak_number_not_understood()
+            return
+        n = int(n)
+
+        self._taught_facts = []
+        rows = multiplication_table(n)
+        for i, table_n, product in rows:
+            rendered = self.resources.load_dialog_file(
+                "table_row", {"i": i, "n": table_n, "product": product})[0]
+            self.speak(rendered, wait=True)
+            self._taught_facts.append((i, table_n, product))
+
+            is_last_row = (i, table_n, product) == rows[-1]
+            if is_last_row:
+                break
+            response = self.get_response(dialog="continue_teaching_prompt")
+            if response and self.voc_match(response, "repeat"):
+                self.speak(rendered, wait=True)
+
+        self.speak_dialog("teaching_finished", {"count": len(self._taught_facts)})
+
+    @intent_handler("quiz_taught.intent")
+    def handle_quiz_taught(self, message):
+        if not self._taught_facts:
+            self.speak_dialog("nothing_taught_yet")
+            return
+        self._run_quiz_from_facts(self._taught_facts, operation="multiply")

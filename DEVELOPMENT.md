@@ -25,6 +25,11 @@ than actually speaking each row separately.
 scoring and flow logic (all-correct, all-wrong, no-response-doesn't-
 crash) is tested deterministically rather than depending on real
 randomness or actual speech I/O.
+`tests/test_teach_then_practice.py` covers the teach-then-practice
+loop similarly: `get_response()` and `voc_match()` mocked to verify
+the row-by-row teaching flow, the "repeat" branch, that no prompt is
+asked after the final row, and that the follow-up quiz grades against
+exactly the recorded taught facts rather than fresh random ones.
 
 ## Adding a new quiz mode or operation
 

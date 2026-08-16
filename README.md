@@ -7,7 +7,7 @@ operations. Fully offline.
 [![Tests](https://github.com/andlo/ovos-skill-math-practice/actions/workflows/test.yml/badge.svg)](https://github.com/andlo/ovos-skill-math-practice/actions/workflows/test.yml)
 [![PyPI version](https://img.shields.io/pypi/v/ovos-skill-math-practice.svg)](https://pypi.org/project/ovos-skill-math-practice/)
 
-## Three separate modes, deliberately not one "do math" intent
+## Four modes, deliberately not one "do math" intent
 
 1. **Counting** - `"count to ten"` - pure recitation, no interaction.
 2. **Table recitation** - `"say the 5 times table"` - pure recitation
@@ -15,7 +15,12 @@ operations. Fully offline.
    addition/subtraction/division don't have a traditional "table"
    concept the same way, so this stays scoped to what "times table"
    actually means.
-3. **Quiz** - `"quiz me on the 3 times table"` / `"quiz me on
+3. **Teach, then practice** - `"teach me the 5 times table"` goes
+   through the table one row at a time (say "repeat" to hear a row
+   again before moving on), then `"quiz me on what you taught me"`
+   quizzes specifically on THOSE facts - not arbitrary random
+   problems. See "Teach-then-practice" below.
+4. **Quiz** - `"quiz me on the 3 times table"` / `"quiz me on
    addition"` - genuinely interactive: asks 5 questions one at a
    time, listens for a spoken answer, and reports a final score.
    Covers all four basic operations, not just multiplication - this
@@ -26,13 +31,38 @@ operations. Fully offline.
 ```
 "count to ten"
 "say the 5 times table"
+"teach me the 5 times table"
+"quiz me on what you taught me"
 "quiz me on the 3 times table"
 "quiz me on addition"
 "give me a math quiz"
 "tæl til ti"                    (Danish)
 "sig 5 tabellen"                (Danish)
+"lær mig 5 tabellen"            (Danish)
+"quiz mig i det du lærte mig"   (Danish)
 "quiz mig i 3 tabellen"         (Danish)
 ```
+
+## Teach-then-practice
+
+The reference implementation of the pattern shared across the whole
+`*-practice` family (see [issue #1](https://github.com/andlo/ovos-skill-math-practice/issues/1)
+for the original design discussion). `"teach me the 5 times table"`
+speaks each row in turn, waits for either "repeat" (says the same row
+again) or anything else (moves to the next row), and records exactly
+which facts were presented. `"quiz me on what you taught me"` then
+quizzes ONLY on that recorded set, reusing the same grading logic as
+the regular quiz mode (`_ask_and_grade()`), rather than generating
+fresh random problems.
+
+**Deliberately session-only for this release**: `self._taught_facts`
+resets when the skill restarts - it doesn't persist across days. This
+was a scoped-down choice from the original design discussion, which
+also considered persisting taught facts (via `self.settings` or a
+local file) so "quiz me on what you taught me" would still work in a
+later session. Kept simple for v1; worth revisiting if session-only
+turns out to be a real limitation in practice rather than a
+theoretical one.
 
 ## How the quiz works
 

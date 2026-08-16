@@ -25,4 +25,5 @@ def skill(monkeypatch):
     monkeypatch.setattr(MathPractice, "lang", "en-us", raising=False)
     s.res_dir = str(Path(__file__).resolve().parents[1])
     s._lang_resources = {}
+    s._taught_facts = []  # normally set by initialize(), which __new__() bypasses
     return s
