@@ -1,0 +1,9 @@
+{
+  "_notes": [
+    "Keys are the spoken operation name, values are the key in OPERATIONS (__init__.py)."
+  ],
+  "addition": "add",
+  "subtraction": "subtract",
+  "multiplication": "multiply",
+  "division": "divide"
+}

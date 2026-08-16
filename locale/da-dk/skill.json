@@ -1,0 +1,23 @@
+{
+  "skill_id": "ovos-skill-math-practice.andlo",
+  "source": "https://github.com/andlo/ovos-skill-math-practice",
+  "package_name": "ovos-skill-math-practice",
+  "pip_spec": "ovos-skill-math-practice",
+  "license": "GPL-3.0-or-later",
+  "author": "andlo",
+  "name": "Regnetræning",
+  "description": "Regnetræning til børn - tælle, tabel-recitation, og interaktive quizzer i plus, minus, gange og division. Fuldstændig offline.",
+  "examples": [
+    "tæl til ti",
+    "sig 5 tabellen",
+    "quiz mig i 3 tabellen"
+  ],
+  "tags": [
+    "matematik",
+    "undervisning",
+    "tabeller",
+    "quiz",
+    "børn"
+  ],
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-math-practice/main/icon.png"
+}

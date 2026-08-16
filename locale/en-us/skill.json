@@ -1,0 +1,23 @@
+{
+  "skill_id": "ovos-skill-math-practice.andlo",
+  "source": "https://github.com/andlo/ovos-skill-math-practice",
+  "package_name": "ovos-skill-math-practice",
+  "pip_spec": "ovos-skill-math-practice",
+  "license": "GPL-3.0-or-later",
+  "author": "andlo",
+  "name": "Math Practice",
+  "description": "Math practice for kids - counting, times table recitation, and interactive quizzes across addition, subtraction, multiplication, and division. Fully offline.",
+  "examples": [
+    "count to ten",
+    "say the 5 times table",
+    "quiz me on the 3 times table"
+  ],
+  "tags": [
+    "math",
+    "education",
+    "times tables",
+    "quiz",
+    "kids"
+  ],
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-math-practice/main/icon.png"
+}
