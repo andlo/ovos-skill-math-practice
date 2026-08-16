@@ -26,4 +26,5 @@ def skill(monkeypatch):
     s.res_dir = str(Path(__file__).resolve().parents[1])
     s._lang_resources = {}
     s._taught_facts = []  # normally set by initialize(), which __new__() bypasses
+    s._taught_operation = "multiply"
     return s

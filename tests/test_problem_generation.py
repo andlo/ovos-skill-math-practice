@@ -49,3 +49,27 @@ def test_unknown_operation_raises():
     from mathpractice_skill import generate_problem
     with pytest.raises(ValueError):
         generate_problem("exponentiate")
+
+
+def test_addition_table_matches_real_arithmetic():
+    from mathpractice_skill import addition_table
+    for a, b, answer in addition_table(7):
+        assert a + b == answer
+
+
+def test_subtraction_table_matches_real_arithmetic_and_stays_non_negative():
+    from mathpractice_skill import subtraction_table
+    for a, b, answer in subtraction_table(7):
+        assert a - b == answer
+        assert answer >= 0
+
+
+def test_division_table_matches_real_arithmetic():
+    from mathpractice_skill import division_table
+    for a, b, answer in division_table(7):
+        assert a / b == answer
+
+
+def test_fact_table_generators_registry_covers_all_four_operations():
+    from mathpractice_skill import FACT_TABLE_GENERATORS, OPERATIONS
+    assert set(FACT_TABLE_GENERATORS.keys()) == set(OPERATIONS)

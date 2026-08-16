@@ -15,11 +15,14 @@ operations. Fully offline.
    addition/subtraction/division don't have a traditional "table"
    concept the same way, so this stays scoped to what "times table"
    actually means.
-3. **Teach, then practice** - `"teach me the 5 times table"` goes
-   through the table one row at a time (say "repeat" to hear a row
-   again before moving on), then `"quiz me on what you taught me"`
-   quizzes specifically on THOSE facts - not arbitrary random
-   problems. See "Teach-then-practice" below.
+3. **Teach, then practice** - `"teach me the 5 times table"` (or
+   `"teach me addition facts for 5"` / `"teach me subtraction facts
+   for 5"` / `"teach me division facts for 5"` - all four operations,
+   not just multiplication) goes through the facts one row at a time
+   (say "repeat" to hear a row again before moving on), then `"quiz
+   me on what you taught me"` quizzes specifically on THOSE facts -
+   not arbitrary random problems, and in the SAME operation that was
+   taught. See "Teach-then-practice" below.
 4. **Quiz** - `"quiz me on the 3 times table"` / `"quiz me on
    addition"` - genuinely interactive: asks 5 questions one at a
    time, listens for a spoken answer, and reports a final score.
@@ -32,6 +35,9 @@ operations. Fully offline.
 "count to ten"
 "say the 5 times table"
 "teach me the 5 times table"
+"teach me addition facts for 5"
+"teach me subtraction facts for 5"
+"teach me division facts for 5"
 "quiz me on what you taught me"
 "quiz me on the 3 times table"
 "quiz me on addition"
@@ -39,6 +45,7 @@ operations. Fully offline.
 "tæl til ti"                    (Danish)
 "sig 5 tabellen"                (Danish)
 "lær mig 5 tabellen"            (Danish)
+"lær mig plus for 5"            (Danish)
 "quiz mig i det du lærte mig"   (Danish)
 "quiz mig i 3 tabellen"         (Danish)
 ```
@@ -47,13 +54,23 @@ operations. Fully offline.
 
 The reference implementation of the pattern shared across the whole
 `*-practice` family (see [issue #1](https://github.com/andlo/ovos-skill-math-practice/issues/1)
-for the original design discussion). `"teach me the 5 times table"`
-speaks each row in turn, waits for either "repeat" (says the same row
-again) or anything else (moves to the next row), and records exactly
-which facts were presented. `"quiz me on what you taught me"` then
-quizzes ONLY on that recorded set, reusing the same grading logic as
-the regular quiz mode (`_ask_and_grade()`), rather than generating
-fresh random problems.
+for the original design discussion, since resolved and extended to
+all four operations). `"teach me the 5 times table"` speaks each row
+in turn, waits for either "repeat" (says the same row again) or
+anything else (moves to the next row), and records exactly which
+facts were presented AND which operation they belong to. `"quiz me on
+what you taught me"` then quizzes ONLY on that recorded set, in the
+same operation, reusing the same grading logic as the regular quiz
+mode (`_ask_and_grade()`), rather than generating fresh random
+problems.
+
+Started multiply-only (mirroring "times table" recitation), then
+generalized to all four operations via a shared
+`FACT_TABLE_GENERATORS` registry - addition/subtraction/division each
+get their own "N-facts table" generator, mirroring multiplication's
+table shape (subtraction and division specifically constructed so
+results stay non-negative / evenly divide, matching the same rules
+the regular quiz mode already enforces).
 
 **Deliberately session-only for this release**: `self._taught_facts`
 resets when the skill restarts - it doesn't persist across days. This

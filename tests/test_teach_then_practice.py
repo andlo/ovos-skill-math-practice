@@ -109,3 +109,104 @@ def test_quiz_taught_uses_multiply_question_dialog(skill):
     skill.handle_quiz_taught(_msg())
     dialog_name = skill.get_response.call_args_list[0][1]["dialog"]
     assert dialog_name == "quiz_question_multiply"
+
+
+def _fake_resources_generic():
+    """A load_dialog_file stand-in that renders BOTH the multiply
+    field names (i/n/product) and the generic ones (a/b/answer),
+    matching whichever the real dialog file would actually receive."""
+    def _render(name, data):
+        if "product" in data:
+            return [f"{data['i']} times {data['n']} is {data['product']}"]
+        return [f"{data['a']} {name.split('_')[-1]} {data['b']} is {data['answer']}"]
+    m = MagicMock()
+    m.load_dialog_file = MagicMock(side_effect=_render)
+    return m
+
+
+def test_teach_me_operation_addition(skill):
+    skill.speak = MagicMock()
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="ok")
+    skill.voc_match = MagicMock(return_value=False)
+    with patch.object(type(skill), "resources", property(lambda self: _fake_resources_generic())):
+        skill.handle_teach_me_operation(_msg(operation="addition", number="5"))
+
+    assert skill._taught_operation == "add"
+    assert len(skill._taught_facts) == 10
+    assert skill._taught_facts[0] == (5, 1, 6)  # 5 + 1 = 6
+    assert skill._taught_facts[-1] == (5, 10, 15)  # 5 + 10 = 15
+
+
+def test_teach_me_operation_subtraction(skill):
+    skill.speak = MagicMock()
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="ok")
+    skill.voc_match = MagicMock(return_value=False)
+    with patch.object(type(skill), "resources", property(lambda self: _fake_resources_generic())):
+        skill.handle_teach_me_operation(_msg(operation="subtraction", number="5"))
+
+    assert skill._taught_operation == "subtract"
+    assert skill._taught_facts[0] == (6, 5, 1)  # 6 - 5 = 1
+    assert skill._taught_facts[-1] == (15, 5, 10)  # 15 - 5 = 10
+
+
+def test_teach_me_operation_division(skill):
+    skill.speak = MagicMock()
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="ok")
+    skill.voc_match = MagicMock(return_value=False)
+    with patch.object(type(skill), "resources", property(lambda self: _fake_resources_generic())):
+        skill.handle_teach_me_operation(_msg(operation="division", number="5"))
+
+    assert skill._taught_operation == "divide"
+    assert skill._taught_facts[0] == (5, 5, 1)  # 5 / 5 = 1
+    assert skill._taught_facts[-1] == (50, 5, 10)  # 50 / 5 = 10
+
+
+def test_teach_me_operation_unknown_operation(skill):
+    skill.speak = MagicMock()
+    skill.speak_dialog = MagicMock()
+    skill.handle_teach_me_operation(_msg(operation="calculus", number="5"))
+    skill.speak_dialog.assert_called_once_with(
+        "operation_not_understood", {"operation": "calculus"})
+    skill.speak.assert_not_called()
+
+
+def test_teach_me_operation_unparseable_number(skill):
+    skill.speak = MagicMock()
+    skill.speak_dialog = MagicMock()
+    skill.handle_teach_me_operation(_msg(operation="addition", number="banana"))
+    skill.speak_dialog.assert_called_once_with("number_not_understood")
+    skill.speak.assert_not_called()
+
+
+def test_teach_me_times_table_still_defaults_operation_to_multiply(skill):
+    """The original shorthand intent ('teach me the N times table')
+    must still set _taught_operation correctly, so quiz_taught still
+    asks multiplication questions afterward - a regression check for
+    the refactor that generalized teach mode to all four operations."""
+    skill.speak = MagicMock()
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="ok")
+    skill.voc_match = MagicMock(return_value=False)
+    fake_resources = MagicMock()
+    fake_resources.load_dialog_file = MagicMock(
+        side_effect=lambda name, data: [f"{data['i']} times {data['n']} is {data['product']}"])
+    with patch.object(type(skill), "resources", property(lambda self: fake_resources)):
+        skill.handle_teach_me(_msg(number="5"))
+    assert skill._taught_operation == "multiply"
+
+
+def test_quiz_taught_uses_the_operation_that_was_actually_taught(skill):
+    """After teaching subtraction, quiz_taught must ask subtraction
+    questions, not default back to multiply."""
+    skill.speak_dialog = MagicMock()
+    skill._taught_facts = [(6, 5, 1), (7, 5, 2)]
+    skill._taught_operation = "subtract"
+    skill.get_response = MagicMock(side_effect=["1", "2"])
+    skill.handle_quiz_taught(_msg())
+    dialog_name = skill.get_response.call_args_list[0][1]["dialog"]
+    assert dialog_name == "quiz_question_subtract"
+    final_call = skill.speak_dialog.call_args_list[-1]
+    assert final_call == (("quiz_finished", {"correct": 2, "total": 2}), {})

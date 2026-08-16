@@ -109,6 +109,46 @@ def multiplication_table(n, up_to=10):
     return [(i, n, i * n) for i in range(1, up_to + 1)]
 
 
+def addition_table(n, up_to=10):
+    """[(n, 1, n+1), (n, 2, n+2), ..., (n, up_to, n+up_to)] -
+    'n plus i is n+i'. (a, b, answer) ordering already matches
+    quiz_question_add.dialog's 'what is {a} plus {b}' directly."""
+    return [(n, i, n + i) for i in range(1, up_to + 1)]
+
+
+def subtraction_table(n, up_to=10):
+    """[(n+1, n, 1), (n+2, n, 2), ..., (n+up_to, n, up_to)] -
+    '(n+i) minus n is i'. Fixes n as the subtrahend so results always
+    run 1..up_to, staying non-negative - mirrors the same rule
+    generate_problem()'s subtract case already applies (larger number
+    first). (a, b, answer) ordering matches
+    quiz_question_subtract.dialog's 'what is {a} minus {b}'."""
+    return [(n + i, n, i) for i in range(1, up_to + 1)]
+
+
+def division_table(n, up_to=10):
+    """[(n*1, n, 1), (n*2, n, 2), ..., (n*up_to, n, up_to)] -
+    '(n*i) divided by n is i'. Mirror of multiplication_table, and
+    matches generate_problem()'s divide case (dividend = divisor x
+    quotient). (a, b, answer) ordering matches
+    quiz_question_divide.dialog's 'what is {a} divided by {b}'."""
+    return [(n * i, n, i) for i in range(1, up_to + 1)]
+
+
+# operation -> its "N-facts table" generator, for teach mode. multiply's
+# generator returns (varying_factor, fixed_factor, product) rather than
+# strict (a, b, answer) order - harmless since multiplication is
+# commutative, but the other three DO need the exact order shown above
+# since add/subtract/divide are not commutative and the wrong order
+# would make quiz_question_{op}.dialog speak a wrong statement.
+FACT_TABLE_GENERATORS = {
+    "add": addition_table,
+    "subtract": subtraction_table,
+    "multiply": multiplication_table,
+    "divide": division_table,
+}
+
+
 SKILL_ROOT = Path(__file__).resolve().parent
 LOCALE_DIR = SKILL_ROOT / "locale"
 
@@ -144,6 +184,7 @@ class MathPractice(OVOSSkill):
         # simple for v1, tracked as a possible future upgrade rather
         # than built speculatively).
         self._taught_facts = []
+        self._taught_operation = "multiply"
 
     def _speak_number_not_understood(self):
         self.speak_dialog("number_not_understood")
@@ -283,25 +324,40 @@ class MathPractice(OVOSSkill):
     # and open questions)
     # ------------------------------------------------------------------
 
-    @intent_handler("teach_me.intent")
-    def handle_teach_me(self, message):
-        n_raw = message.data.get("number")
-        n = extract_number(n_raw, lang=self.lang) if n_raw else None
-        if n is False or n is None or n < 1:
-            self._speak_number_not_understood()
-            return
-        n = int(n)
-
+    def _teach_facts_for_operation(self, operation, n):
+        """Shared by handle_teach_me() (multiply-only, the original
+        'times table' phrasing) and handle_teach_me_operation() (any
+        of the four operations). Speaks each row of the operation's
+        N-facts table in turn, offers a 'repeat' before moving to the
+        next row, and records exactly which facts were presented -
+        both the facts themselves and which operation they belong to,
+        so the follow-up quiz asks about them correctly."""
         self._taught_facts = []
-        rows = multiplication_table(n)
-        for i, table_n, product in rows:
-            rendered = self.resources.load_dialog_file(
-                "table_row", {"i": i, "n": table_n, "product": product})[0]
-            self.speak(rendered, wait=True)
-            self._taught_facts.append((i, table_n, product))
+        self._taught_operation = operation
+        generator = FACT_TABLE_GENERATORS[operation]
+        rows = generator(n)
+        # multiply keeps using table_row.dialog (its original field
+        # names {i,n,product}) for backward compatibility with
+        # recite_table, which also depends on that exact dialog -
+        # add/subtract/divide are new, so they get a clean {a,b,answer}
+        # dialog matching the (a, b, answer) tuples the generators
+        # above already produce.
+        for idx, row in enumerate(rows):
+            if operation == "multiply":
+                i, table_n, product = row
+                rendered = self.resources.load_dialog_file(
+                    "table_row", {"i": i, "n": table_n, "product": product})[0]
+                fact = (i, table_n, product)
+            else:
+                a, b, answer = row
+                rendered = self.resources.load_dialog_file(
+                    f"teach_row_{operation}", {"a": a, "b": b, "answer": answer})[0]
+                fact = (a, b, answer)
 
-            is_last_row = (i, table_n, product) == rows[-1]
-            if is_last_row:
+            self.speak(rendered, wait=True)
+            self._taught_facts.append(fact)
+
+            if idx == len(rows) - 1:
                 break
             response = self.get_response(dialog="continue_teaching_prompt")
             if response and self.voc_match(response, "repeat"):
@@ -309,9 +365,32 @@ class MathPractice(OVOSSkill):
 
         self.speak_dialog("teaching_finished", {"count": len(self._taught_facts)})
 
+    @intent_handler("teach_me.intent")
+    def handle_teach_me(self, message):
+        n_raw = message.data.get("number")
+        n = extract_number(n_raw, lang=self.lang) if n_raw else None
+        if n is False or n is None or n < 1:
+            self._speak_number_not_understood()
+            return
+        self._teach_facts_for_operation("multiply", int(n))
+
+    @intent_handler("teach_me_operation.intent")
+    def handle_teach_me_operation(self, message):
+        operation_raw = message.data.get("operation")
+        operation = self._resolve_operation(operation_raw, self.lang) if operation_raw else None
+        if operation is None:
+            self.speak_dialog("operation_not_understood", {"operation": operation_raw or ""})
+            return
+        n_raw = message.data.get("number")
+        n = extract_number(n_raw, lang=self.lang) if n_raw else None
+        if n is False or n is None or n < 1:
+            self._speak_number_not_understood()
+            return
+        self._teach_facts_for_operation(operation, int(n))
+
     @intent_handler("quiz_taught.intent")
     def handle_quiz_taught(self, message):
         if not self._taught_facts:
             self.speak_dialog("nothing_taught_yet")
             return
-        self._run_quiz_from_facts(self._taught_facts, operation="multiply")
+        self._run_quiz_from_facts(self._taught_facts, operation=self._taught_operation)
