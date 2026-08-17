@@ -90,6 +90,28 @@ choices is the right number for a voice-only interaction (vs. glancing
 at a screen) is flagged as an open question in the issue itself -
 worth testing on a live instance.
 
+## Decimal arithmetic
+
+`"quiz me on decimal addition"` / `"quiz mig i decimaltal i
+subtraktion"` asks a one-decimal-place question ("what is 7.3 plus
+2.5"), reusing the exact same `quiz_question_<op>.dialog` files as
+the integer version. Every decimal problem is constructed to be
+EXACT (integer-tenths arithmetic internally, converted to a float
+only once) rather than needing a genuine estimation-tolerance band -
+see
+[issue #5](https://github.com/andlo/ovos-skill-math-practice/issues/5)
+and `generate_decimal_problem()` in `__init__.py`. This sidesteps the
+tolerance-band question for THIS skill (every operation here can be
+constructed exact); it does not answer it for genuinely irrational
+quantities like
+[ovos-skill-unit-practice](https://github.com/andlo/ovos-skill-unit-practice)'s
+meter-to-mile conversion, which will still need real tolerance-band
+grading. Fractions are intentionally out of scope here - a separate,
+later design pass, per the issue's own recommendation. Whether STT
+reliably transcribes a spoken decimal number at all (e.g. "seven
+point three") is untested - flagged in the issue, worth verifying on
+a live instance.
+
 ## Usage
 ```
 "count to ten"
@@ -106,6 +128,7 @@ worth testing on a live instance.
 "quiz me on chained subtraction"
 "quiz me on mixed operators"
 "quiz me on estimation"
+"quiz me on decimal addition"
 "give me a math quiz"
 "give me a full math quiz"
 "tæl til ti"                    (Danish)
@@ -119,6 +142,7 @@ worth testing on a live instance.
 "quiz mig i kædet subtraktion"  (Danish)
 "quiz mig i blandede regnearter" (Danish)
 "quiz mig i estimering"         (Danish)
+"quiz mig i decimaltal i addition" (Danish)
 "quiz mig i det hele"           (Danish)
 ```
 

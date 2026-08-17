@@ -85,6 +85,20 @@ one factor rounded), not random noise - see
 generate_estimate_problem(). Also not difficulty-aware or part of
 OPERATIONS/ALL_OPERATIONS for v1.
 
+DECIMAL ARITHMETIC (fractions are a separate, later pass)
+-----------------------------------------------------------------
+"quiz me on decimal addition" (issue #5, decimals half only) asks a
+one-decimal-place question ("what is 7.3 plus 2.5"), reusing the same
+quiz_question_<op>.dialog files as the integer version. Every decimal
+problem is constructed to be EXACT (integer-tenths arithmetic
+internally, converted to float only once) rather than needing a
+genuine tolerance band - see generate_decimal_problem()'s docstring
+for why this sidesteps, rather than answers, the tolerance-band
+question that genuinely irrational quantities (e.g.
+ovos-skill-unit-practice's unit conversions) will still need to
+solve properly. Fractions are intentionally out of scope here - a
+separate design pass, per the issue.
+
 ARCHITECTURE NOTE: get_response(), NOT A BACKGROUND THREAD
 -----------------------------------------------------------------
 Unlike ovos-skill-metronome/ovos-skill-rhythm-box/ovos-skill-white-
@@ -192,6 +206,21 @@ ESTIMATE_MULTIPLY_A_MIN, ESTIMATE_MULTIPLY_A_MAX = 100, 999
 ESTIMATE_MULTIPLY_B_MIN, ESTIMATE_MULTIPLY_B_MAX = 1000, 9999
 ESTIMATE_DIVIDE_DIVISOR_MIN, ESTIMATE_DIVIDE_DIVISOR_MAX = 10, 99
 ESTIMATE_DIVIDE_QUOTIENT_MIN, ESTIMATE_DIVIDE_QUOTIENT_MAX = 100, 9999
+
+# Decimal arithmetic (issue #5, decimals half only - fractions are a
+# deliberately separate, later design pass, see the issue). Exactly
+# one decimal place throughout - see generate_decimal_problem()'s
+# docstring for why every decimal problem here is constructed to be
+# EXACT rather than needing a genuine tolerance band.
+DECIMAL_ADD_SUB_MIN, DECIMAL_ADD_SUB_MAX = 1, 20  # mirrors ADD_SUB's medium range
+DECIMAL_MULTIPLY_MIN, DECIMAL_MULTIPLY_MAX = 1, 12
+DECIMAL_DIVIDE_QUOTIENT_MIN, DECIMAL_DIVIDE_QUOTIENT_MAX = 1, 12
+DECIMAL_DIVIDE_DIVISOR_MIN, DECIMAL_DIVIDE_DIVISOR_MAX = 1, 10
+# Guards against float-representation quirks after two independent
+# float() conversions (the generated answer's, and extract_number()'s
+# parse of the spoken response) - NOT a pedagogical estimation
+# tolerance. Every decimal problem here is exact by construction.
+DECIMAL_GRADING_EPSILON = 0.01
 
 # The classic four - what "quiz me on math" / "give me a math quiz"
 # (quiz_general.intent) randomizes across. Deliberately NOT auto-grown
@@ -428,6 +457,50 @@ def generate_estimate_problem():
     return a, operation, b, answer, choices, correct_index
 
 
+def generate_decimal_problem(operation):
+    """Returns (a, b, answer) for a one-decimal-place question, e.g.
+    (7.3, 2.5, 9.8) for add. All arithmetic is done in integer TENTHS
+    internally (7.3 -> 73) and converted to a float only once, at the
+    very end - avoids floating-point accumulation error (never risks
+    something like 0.1 + 0.2 = 0.30000000000000004 turning up as the
+    'correct' answer). Division is built backward, like every other
+    divide in this module, so it always divides evenly to exactly one
+    decimal place.
+
+    This SIDESTEPS issue #5's open tolerance-band question rather
+    than answering it: every decimal problem here is exact by
+    construction, so grading only needs DECIMAL_GRADING_EPSILON (a
+    float-representation guard, not a real tolerance band) - not a
+    general solution to genuinely irrational quantities (e.g.
+    ovos-skill-unit-practice's meter-to-mile conversion, which can
+    never be exact), just this skill's own resolution for arithmetic
+    that CAN be constructed exact.
+
+    Multiply uses only ONE decimal operand (the other a whole number)
+    - two decimal operands multiplied would need TWO decimal places
+    to stay exact, widening scope beyond what's stated here."""
+    if operation == "add":
+        a_tenths = random.randint(DECIMAL_ADD_SUB_MIN * 10, DECIMAL_ADD_SUB_MAX * 10)
+        b_tenths = random.randint(DECIMAL_ADD_SUB_MIN * 10, DECIMAL_ADD_SUB_MAX * 10)
+        return a_tenths / 10, b_tenths / 10, (a_tenths + b_tenths) / 10
+    elif operation == "subtract":
+        a_tenths = random.randint(DECIMAL_ADD_SUB_MIN * 10, DECIMAL_ADD_SUB_MAX * 10)
+        b_tenths = random.randint(DECIMAL_ADD_SUB_MIN * 10, DECIMAL_ADD_SUB_MAX * 10)
+        if b_tenths > a_tenths:
+            a_tenths, b_tenths = b_tenths, a_tenths  # keep the result non-negative, see module docstring
+        return a_tenths / 10, b_tenths / 10, (a_tenths - b_tenths) / 10
+    elif operation == "multiply":
+        a_tenths = random.randint(DECIMAL_MULTIPLY_MIN * 10, DECIMAL_MULTIPLY_MAX * 10)
+        b = random.randint(DECIMAL_MULTIPLY_MIN, DECIMAL_MULTIPLY_MAX)
+        return a_tenths / 10, b, (a_tenths * b) / 10
+    elif operation == "divide":
+        quotient_tenths = random.randint(DECIMAL_DIVIDE_QUOTIENT_MIN * 10, DECIMAL_DIVIDE_QUOTIENT_MAX * 10)
+        divisor = random.randint(DECIMAL_DIVIDE_DIVISOR_MIN, DECIMAL_DIVIDE_DIVISOR_MAX)
+        dividend_tenths = quotient_tenths * divisor
+        return dividend_tenths / 10, divisor, quotient_tenths / 10
+    raise ValueError(f"unknown decimal operation: {operation!r}")
+
+
 def multiplication_table(n, up_to=10):
     """Returns [(1, n, 1*n), (2, n, 2*n), ..., (up_to, n, up_to*n)] -
     the actual (factor, table_number, product) rows of a times table,
@@ -658,6 +731,25 @@ class MathPractice(OVOSSkill):
         })
         return False
 
+    def _ask_and_grade_decimal(self, operation, a, b, answer):
+        """Same grading contract as _ask_and_grade(), but compares
+        with DECIMAL_GRADING_EPSILON slack instead of exact equality
+        - see generate_decimal_problem()'s docstring for why that's a
+        float-representation guard, not a real tolerance band.
+        Reuses the SAME quiz_question_<op>.dialog files as the
+        integer version - they're already number-agnostic {a}/{b}
+        templates, no decimal-specific dialog needed."""
+        response_text = self.get_response(dialog=f"quiz_question_{operation}", data={"a": a, "b": b})
+        if response_text is None:
+            self.speak_dialog("quiz_no_answer")
+            return False
+        user_value = extract_number(response_text, lang=self.lang)
+        if user_value is not False and abs(user_value - answer) < DECIMAL_GRADING_EPSILON:
+            self.speak_dialog("quiz_correct")
+            return True
+        self.speak_dialog("quiz_incorrect", {"answer": answer})
+        return False
+
     # ------------------------------------------------------------------
     # Counting
     # ------------------------------------------------------------------
@@ -787,6 +879,18 @@ class MathPractice(OVOSSkill):
                 correct_count += 1
         self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
 
+    def _run_decimal_quiz(self, operation):
+        """'quiz me on decimal addition' etc (issue #5, decimals
+        half). See generate_decimal_problem() for why every question
+        here is exact by construction rather than needing a genuine
+        tolerance band."""
+        correct_count = 0
+        for _ in range(NUM_QUIZ_QUESTIONS):
+            a, b, answer = generate_decimal_problem(operation)
+            if self._ask_and_grade_decimal(operation, a, b, answer):
+                correct_count += 1
+        self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
+
     @intent_handler("quiz_table.intent")
     def handle_quiz_table(self, message):
         n_raw = message.data.get("number")
@@ -869,6 +973,20 @@ class MathPractice(OVOSSkill):
         generate_estimate_problem()). Not part of OPERATIONS/
         ALL_OPERATIONS, same v1 scoping as chain/mixed."""
         self._run_estimate_quiz()
+
+    @intent_handler("quiz_decimal.intent")
+    def handle_quiz_decimal(self, message):
+        """'quiz me on decimal addition' (issue #5, decimals half -
+        fractions are a deliberately separate later pass). Not part
+        of OPERATIONS/ALL_OPERATIONS, same v1 scoping as chain/mixed/
+        estimate."""
+        operation_raw = message.data.get("operation")
+        operation = self._resolve_operation(operation_raw, self.lang) if operation_raw else None
+        if operation_raw and operation is None:
+            self.speak_dialog("operation_not_understood", {"operation": operation_raw})
+            return
+        operation = operation or random.choice(OPERATIONS)
+        self._run_decimal_quiz(operation)
 
     # ------------------------------------------------------------------
     # Teach-then-practice (see README "Shared pattern: teach-then-

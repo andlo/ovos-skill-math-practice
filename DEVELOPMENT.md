@@ -124,6 +124,28 @@ mode needs multiple choice again:
   spoken letter the same way `repeat.voc` already does for
   teach-then-practice.
 
+## Decimals, tolerance bands, and when NOT to use one
+
+`generate_decimal_problem()` (issue #5) does its arithmetic in
+integer TENTHS internally and converts to a float only once, so every
+decimal problem here is exact - grading uses
+`DECIMAL_GRADING_EPSILON` purely as a float-representation guard
+(two independent `float()` conversions occasionally disagree in the
+last bit), not a real tolerance band.
+
+**This is not a general answer to the tolerance-band question** - it
+works here because every operation in this skill CAN be constructed
+to have an exact answer (same "construct it clean" philosophy as
+everything else in this module). A genuinely irrational quantity
+(e.g. `ovos-skill-unit-practice`'s meter-to-mile conversion, or a
+non-Pythagorean-triple hypotenuse in the planned
+`ovos-skill-geometry-practice`) can't be constructed exact and will
+need real tolerance-band grading (e.g. "within 1-2% counts"). Before
+reaching for a real tolerance band anywhere in this project family,
+ask first whether the problem can instead be constructed exact - it
+usually can, and exact grading is simpler and less surprising to a
+user than "correct-ish."
+
 ## Versioning
 
 `version.py` follows `VERSION_MAJOR.VERSION_MINOR.VERSION_BUILD[aVERSION_ALPHA]`.

@@ -262,3 +262,45 @@ def test_quiz_estimate_no_response_counts_as_wrong_but_does_not_crash(skill):
     assert len(no_answer_calls) == 5
     final_call = skill.speak_dialog.call_args_list[-1]
     assert final_call == (("quiz_finished", {"correct": 0, "total": 5}), {})
+
+
+def test_quiz_decimal_uses_existing_question_dialog_and_grades_with_epsilon(skill):
+    """Reuses quiz_question_add.dialog directly (no decimal-specific
+    dialog file), and treats a closely-matching float as correct even
+    if it's not bit-for-bit equal, per DECIMAL_GRADING_EPSILON."""
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="9.8")
+    with patch("mathpractice_skill.generate_decimal_problem", return_value=(7.3, 2.5, 9.8)):
+        skill.handle_quiz_decimal(_msg(operation="addition"))
+    dialog_name = skill.get_response.call_args_list[0][1]["dialog"]
+    assert dialog_name == "quiz_question_add"
+    data = skill.get_response.call_args_list[0][1]["data"]
+    assert data == {"a": 7.3, "b": 2.5}
+    correct_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_correct"]
+    assert len(correct_calls) == 5
+
+
+def test_quiz_decimal_wrong_answer_speaks_quiz_incorrect(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="0")
+    with patch("mathpractice_skill.generate_decimal_problem", return_value=(7.3, 2.5, 9.8)):
+        skill.handle_quiz_decimal(_msg(operation="addition"))
+    final_call = skill.speak_dialog.call_args_list[-1]
+    assert final_call == (("quiz_finished", {"correct": 0, "total": 5}), {})
+
+
+def test_quiz_decimal_unknown_operation_speaks_error(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock()
+    skill.handle_quiz_decimal(_msg(operation="calculus"))
+    skill.speak_dialog.assert_called_once_with(
+        "operation_not_understood", {"operation": "calculus"})
+    skill.get_response.assert_not_called()
+
+
+def test_quiz_decimal_defaults_to_a_random_operation_when_none_given(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="9.8")
+    with patch("mathpractice_skill.generate_decimal_problem", return_value=(7.3, 2.5, 9.8)):
+        skill.handle_quiz_decimal(_msg())
+    assert skill.get_response.call_count == 5

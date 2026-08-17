@@ -299,6 +299,62 @@ def test_dedupe_candidates_produces_all_distinct_values():
     assert result[0] == 100  # first occurrence is never touched
 
 
+def _cents(value):
+    """Round-trip a float through integer tenths to sidestep float
+    comparison noise when asserting on decimal test values."""
+    return round(value * 10)
+
+
+def test_decimal_add_answer_is_correct():
+    from mathpractice_skill import generate_decimal_problem
+    for _ in range(ITERATIONS):
+        a, b, answer = generate_decimal_problem("add")
+        assert _cents(answer) == _cents(a) + _cents(b)
+
+
+def test_decimal_subtract_never_produces_negative_result():
+    from mathpractice_skill import generate_decimal_problem
+    for _ in range(ITERATIONS):
+        a, b, answer = generate_decimal_problem("subtract")
+        assert answer >= 0
+        assert _cents(answer) == _cents(a) - _cents(b)
+
+
+def test_decimal_multiply_answer_is_correct():
+    from mathpractice_skill import generate_decimal_problem
+    for _ in range(ITERATIONS):
+        a, b, answer = generate_decimal_problem("multiply")
+        assert b == int(b)  # the non-decimal operand is a whole number
+        assert _cents(answer) == _cents(a) * b
+
+
+def test_decimal_divide_always_divides_evenly():
+    from mathpractice_skill import generate_decimal_problem
+    for _ in range(ITERATIONS):
+        a, b, answer = generate_decimal_problem("divide")
+        assert b == int(b)  # divisor is a whole number
+        assert _cents(a) % b == 0
+        assert _cents(answer) == _cents(a) // b
+
+
+def test_decimal_operands_have_exactly_one_decimal_place():
+    """Every generated value should round-trip cleanly through tenths
+    - i.e. never produce something like 3.14159 - confirming the
+    integer-tenths construction is doing its job."""
+    from mathpractice_skill import generate_decimal_problem
+    for operation in ("add", "subtract", "multiply", "divide"):
+        for _ in range(ITERATIONS):
+            a, b, answer = generate_decimal_problem(operation)
+            for value in (a, answer):
+                assert abs(value * 10 - round(value * 10)) < 1e-9
+
+
+def test_decimal_unknown_operation_raises():
+    from mathpractice_skill import generate_decimal_problem
+    with pytest.raises(ValueError):
+        generate_decimal_problem("exponentiate")
+
+
 def test_addition_table_matches_real_arithmetic():
     from mathpractice_skill import addition_table
     for a, b, answer in addition_table(7):
