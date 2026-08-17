@@ -1,5 +1,48 @@
 # Development
 
+## Architecture at a glance
+
+Four modes, deliberately kept separate rather than folded into one
+"do math" intent:
+
+1. **Counting** - pure recitation, no interaction.
+2. **Table recitation** - multiplication only; addition/subtraction/
+   division don't have a traditional "table" concept the same way.
+3. **Teach-then-practice** - teach a fact table row by row, then quiz
+   on exactly what was taught (see README "Teach-then-practice" and
+   [issue #1](https://github.com/andlo/ovos-skill-math-practice/issues/1)).
+4. **Quiz** - the interactive core: `OVOSSkill.get_response()` for a
+   sequential, blocking conversation rather than a background thread
+   (unlike `ovos-skill-metronome`/`rhythm-box`/`white-noise`) - a
+   timed-out or unparseable answer is handled explicitly per question
+   rather than crashing the quiz. Covers the classic four operations
+   plus percentages, difficulty levels, chained and mixed-operator
+   problems, an estimation mode, and decimal arithmetic - each added
+   by a tracked GitHub issue (#2 difficulty, #3 chained, #4
+   mixed-operator, #5 decimals, #7 percent, #8 estimation).
+
+**Two operation pools, not one**: `OPERATIONS` (the classic four -
+what `"give me a math quiz"` samples) and `ALL_OPERATIONS` (also
+includes percent - what `"give me a full math quiz"` samples). New
+operations don't automatically join both - see "Adding a new quiz
+mode or operation" below.
+
+**Every generator follows the same rule**: construct problems so the
+answer is exact/valid BY CONSTRUCTION (division as divisor x
+quotient, subtraction with the larger operand first, chain
+subtraction capped by the running total, decimal arithmetic in
+integer tenths, multiple-choice distractors built from named
+mistakes rather than random noise) rather than generating freely and
+rejecting or rounding. See each `generate_*` function's own docstring
+for the specific constraint it enforces, and "Decimals, tolerance
+bands, and when NOT to use one" below for the one place this rule
+runs into a genuine limit.
+
+Chained/mixed-operator/estimation/decimal modes are all deliberately
+NOT difficulty-aware and NOT part of `OPERATIONS`/`ALL_OPERATIONS`
+for v1 - a scoped-down choice repeated across issues #3/#4/#5/#8, not
+an oversight in any one of them.
+
 ## Setup
 ```bash
 git clone https://github.com/andlo/ovos-skill-math-practice.git

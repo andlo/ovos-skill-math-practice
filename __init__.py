@@ -17,111 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ---
 
-Math practice for kids (and anyone else) - three distinct modes,
-deliberately kept separate rather than folded into one "do math"
-intent:
+Math practice for kids (and anyone else): counting, times-table
+recitation, teach-then-practice, and interactive quizzes across
+addition/subtraction/multiplication/division plus percentages,
+difficulty levels, chained and mixed-operator problems, an
+estimation mode, and one-decimal-place arithmetic.
 
-1. COUNTING - "count to ten" - pure recitation, no interaction.
-2. TABLE RECITATION - "say the 5 times table" - pure recitation of
-   1x5 through 10x5, no interaction. Multiplication only - addition/
-   subtraction/division don't have a traditional "table" concept the
-   same way, so this mode is deliberately scoped to what "tabeller"
-   (the original request) actually means in everyday usage.
-3. QUIZ - "quiz me on the 3 times table" / "quiz me on addition" -
-   genuinely interactive: asks NUM_QUIZ_QUESTIONS questions one at a
-   time via get_response(), checks each spoken answer, and reports a
-   final score. Covers all four basic operations, not just
-   multiplication - this was an explicit scope correction from the
-   original "times tables" framing.
-
-PERCENT AND THE TWO OPERATION POOLS
------------------------------------------------------------------
-Percentage ("what is 20 percent of 150") quizzes the same way as the
-classic four via "quiz me on percentages", but is deliberately NOT
-part of OPERATIONS - the pool "give me a math quiz" randomizes
-across. It only joins the broader ALL_OPERATIONS pool, sampled by
-"give me a full math quiz". This keeps "give me a math quiz" meaning
-exactly what it always has, while giving later additions (chained
-problems, mixed-operator, estimation mode - see the open design
-issues) a pool to land in without a retroactive behavior change each
-time. See the ALL_OPERATIONS comment below for the full reasoning.
-
-DIFFICULTY: PER-REQUEST ONLY, NOT PERSISTED
------------------------------------------------------------------
-"quiz me on hard addition" (quiz_operation_difficulty.intent) selects
-one of DIFFICULTIES for that single quiz round only - there's no
-skill-wide default stored in self.settings for v1, matching the same
-"deliberately session-only/simple for v1" choice made for taught
-facts (see below). generate_problem()'s default difficulty is
-"medium", built FROM the existing range constants rather than
-duplicating them, so every call site that doesn't ask for a
-difficulty behaves exactly as it did before difficulty existed. See
-DIFFICULTY_RANGES for the actual per-operation, per-tier ranges and
-issue #2 for the design discussion.
-
-CHAINED AND MIXED-OPERATOR PROBLEMS
------------------------------------------------------------------
-"quiz me on chained addition" (issue #3) asks a same-operator,
-NUM_CHAIN_OPERANDS-operand question ("what is 7 minus 2 minus 1")
-rather than the usual two-operand one. "quiz me on mixed operators"
-(issue #4) asks a 3-operand question with one +/- operator and one
-x/÷ operator, testing real order-of-operations precedence ("what is 4
-plus 3 times 2" = 10, not 14). Both build their spoken question as
-plain text in Python (_render_expression()) rather than through a
-fixed {a}/{b} dialog, since the operand/operator count is variable -
-see quiz_question_expression.dialog. Neither is difficulty-aware or
-part of OPERATIONS/ALL_OPERATIONS for v1 - deliberately scoped down,
-see NUM_CHAIN_OPERANDS's comment and issues #3/#4 for the reasoning.
-
-ESTIMATION MODE
------------------------------------------------------------------
-"quiz me on estimation" (issue #8) asks a large-number multiplication
-or division question with THREE lettered choices (A/B/C) instead of
-a computed spoken number - avoids requiring an unwieldy 8-digit
-answer to be spoken and grades a letter (or the presented number
-itself) instead. The two wrong choices are built from specific,
-plausible estimation mistakes (a decimal-place slip; recomputing with
-one factor rounded), not random noise - see
-generate_estimate_problem(). Also not difficulty-aware or part of
-OPERATIONS/ALL_OPERATIONS for v1.
-
-DECIMAL ARITHMETIC (fractions are a separate, later pass)
------------------------------------------------------------------
-"quiz me on decimal addition" (issue #5, decimals half only) asks a
-one-decimal-place question ("what is 7.3 plus 2.5"), reusing the same
-quiz_question_<op>.dialog files as the integer version. Every decimal
-problem is constructed to be EXACT (integer-tenths arithmetic
-internally, converted to float only once) rather than needing a
-genuine tolerance band - see generate_decimal_problem()'s docstring
-for why this sidesteps, rather than answers, the tolerance-band
-question that genuinely irrational quantities (e.g.
-ovos-skill-unit-practice's unit conversions) will still need to
-solve properly. Fractions are intentionally out of scope here - a
-separate design pass, per the issue.
-
-ARCHITECTURE NOTE: get_response(), NOT A BACKGROUND THREAD
------------------------------------------------------------------
-Unlike ovos-skill-metronome/ovos-skill-rhythm-box/ovos-skill-white-
-noise, quiz mode needs no background thread - it's a sequential,
-blocking conversation (ask, wait for STT to transcribe an answer,
-check it, ask the next one) using OVOSSkill.get_response(), which
-already handles the listen-and-transcribe round-trip. This is
-architecturally simpler than the audio-loop skills, but introduces a
-different kind of failure mode: a timed-out or unparseable spoken
-answer, handled explicitly per question rather than crashing the
-whole quiz.
-
-PROBLEM GENERATION DEFAULTS (state your assumptions, then build)
------------------------------------------------------------------
-- NUM_QUIZ_QUESTIONS = 5 per quiz round.
-- Times tables: the traditional 1-12 range.
-- Addition/subtraction: operands 1-20, subtraction always kept
-  non-negative (larger number first) - a negative answer isn't
-  wrong, but wasn't the kind of practice this was built for.
-- Division: always divides evenly (dividend is constructed as
-  divisor x quotient, both 1-10) - no fractional answers, since
-  spoken fraction-checking is a much harder problem than this skill
-  attempts to solve.
+See README.md for the full feature list, example utterances, and
+per-mode explanations, and DEVELOPMENT.md's "Architecture at a
+glance" for the design rationale behind each mode (including which
+GitHub issue introduced it) - kept out of this docstring so it lives
+in exactly one place rather than drifting out of sync with itself.
 """
 
 import json

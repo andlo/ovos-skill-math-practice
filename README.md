@@ -2,10 +2,24 @@
 
 Math practice for kids (and anyone else) - counting, times table
 recitation, and interactive arithmetic quizzes across all four basic
-operations plus percentages. Fully offline.
+operations plus percentages, difficulty levels, chained and
+mixed-operator problems, an estimation mode, and one-decimal-place
+arithmetic. Fully offline.
 
 [![Tests](https://github.com/andlo/ovos-skill-math-practice/actions/workflows/test.yml/badge.svg)](https://github.com/andlo/ovos-skill-math-practice/actions/workflows/test.yml)
 [![PyPI version](https://img.shields.io/pypi/v/ovos-skill-math-practice.svg)](https://pypi.org/project/ovos-skill-math-practice/)
+
+- [Four modes](#four-modes-deliberately-not-one-do-math-intent)
+- [Difficulty](#difficulty)
+- [Chained and mixed-operator problems](#chained-and-mixed-operator-problems)
+- [Estimation mode](#estimation-mode)
+- [Decimal arithmetic](#decimal-arithmetic)
+- [Usage](#usage)
+- [Teach-then-practice](#teach-then-practice)
+- [How the quiz works](#how-the-quiz-works)
+- [Problem generation defaults](#problem-generation-defaults)
+- [Install](#install)
+- [Development](#development)
 
 ## Four modes, deliberately not one "do math" intent
 
@@ -200,10 +214,11 @@ unparseable answer counts as incorrect rather than crashing the quiz.
 - Percentage: built backwards like division - the percentage (1-100)
   is picked first, then a base is constructed that's guaranteed to
   make `percent/100*base` a whole number, rather than picking both
-  numbers freely and rounding. No tolerance/rounding needed for v1
-  (see [issue #5](https://github.com/andlo/ovos-skill-math-practice/issues/5)
-  for the tolerance-band question decimals/fractions will eventually
-  raise).
+  numbers freely and rounding. No tolerance/rounding needed - same
+  "construct it exact" approach decimal arithmetic uses too (see
+  "Decimal arithmetic" above); fractions are the one remaining piece
+  of [issue #5](https://github.com/andlo/ovos-skill-math-practice/issues/5)
+  that may genuinely need a tolerance band.
 - All of the above are the `medium` difficulty ranges - see
   "Difficulty" above for `easy`/`hard`.
 
