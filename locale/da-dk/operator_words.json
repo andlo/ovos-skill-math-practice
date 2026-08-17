@@ -1,0 +1,9 @@
+{
+  "_notes": [
+    "Modsat retning af operation_aliases.json - {operation: talt ord}."
+  ],
+  "add": "plus",
+  "subtract": "minus",
+  "multiply": "gange",
+  "divide": "divideret med"
+}

@@ -83,6 +83,28 @@ comment and issue #2) - don't add a `self.settings`-persisted default
 without a real, demonstrated need for one; that's a deliberate
 scoped-down v1 choice, not an oversight.
 
+## Variable-shape questions (chained, mixed-operator)
+
+`generate_chain_problem()` (issue #3) and `generate_mixed_problem()`
+(issue #4) don't fit the fixed `(operation, a, b)` shape every other
+generator uses, so they don't go through `_ask_and_grade()` or a
+per-op `quiz_question_<op>.dialog`. Instead:
+
+- `_render_expression(parts)` builds the spoken question as plain
+  text in Python from an alternating `[operand, operation, operand,
+  ...]` list, using `operator_words.json` (the reverse of
+  `operation_aliases.json` - operation -> spoken word, not word ->
+  operation) for localized operator words.
+- `quiz_question_expression.dialog` (just `"what is {expression}"`)
+  is the one shared dialog both use.
+- `_ask_and_grade_expression(parts, answer)` is the equivalent of
+  `_ask_and_grade()` for this shape.
+
+If a future variable-shape mode needs different final-answer grading
+(not "does the spoken number match"), it'll need its own grading
+function - `_ask_and_grade_expression()` assumes a single numeric
+answer, same as everything else in this skill so far.
+
 ## Versioning
 
 `version.py` follows `VERSION_MAJOR.VERSION_MINOR.VERSION_BUILD[aVERSION_ALPHA]`.

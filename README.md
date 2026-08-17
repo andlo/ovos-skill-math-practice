@@ -52,6 +52,28 @@ for the actual per-operation, per-tier ranges. Times-table quizzing
 (`"quiz me on the 5 times table"`) doesn't take a difficulty - the
 table number itself already controls how hard it is.
 
+## Chained and mixed-operator problems
+
+`"quiz me on chained addition"` / `"quiz mig i kædet subtraktion"`
+asks a 3-operand, same-operator question ("what is 7 minus 2 minus
+1") instead of the usual two-operand one. Subtraction and division
+chains are built so every INTERMEDIATE step stays valid (non-negative
+/ evenly divides), not just the final result - see
+[issue #3](https://github.com/andlo/ovos-skill-math-practice/issues/3).
+
+`"quiz me on mixed operators"` / `"quiz mig i blandede regnearter"`
+asks a 3-operand question with one +/- operator and one x/÷ operator,
+testing real order-of-operations precedence ("what is 4 plus 3 times
+2" = 10, not 14) - see
+[issue #4](https://github.com/andlo/ovos-skill-math-practice/issues/4),
+including its open question about whether a spoken question conveys
+precedence as unambiguously as a written one does; worth verifying on
+a live instance rather than assuming.
+
+Neither mode is difficulty-aware or part of `OPERATIONS`/
+`ALL_OPERATIONS` for v1 - a deliberate, scoped-down choice, not an
+oversight.
+
 ## Usage
 ```
 "count to ten"
@@ -65,6 +87,8 @@ table number itself already controls how hard it is.
 "quiz me on addition"
 "quiz me on percentages"
 "quiz me on hard addition"
+"quiz me on chained subtraction"
+"quiz me on mixed operators"
 "give me a math quiz"
 "give me a full math quiz"
 "tæl til ti"                    (Danish)
@@ -75,6 +99,8 @@ table number itself already controls how hard it is.
 "quiz mig i 3 tabellen"         (Danish)
 "quiz mig i procent"            (Danish)
 "quiz mig i svær division"      (Danish)
+"quiz mig i kædet subtraktion"  (Danish)
+"quiz mig i blandede regnearter" (Danish)
 "quiz mig i det hele"           (Danish)
 ```
 

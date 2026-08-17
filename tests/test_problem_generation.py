@@ -152,6 +152,105 @@ def test_multiply_with_explicit_table_ignores_factor_range_but_keeps_other_range
             assert answer == 7 * b
 
 
+def test_chain_add_answer_is_correct_and_has_right_operand_count():
+    from mathpractice_skill import generate_chain_problem, NUM_CHAIN_OPERANDS
+    for _ in range(ITERATIONS):
+        operands, answer = generate_chain_problem("add")
+        assert len(operands) == NUM_CHAIN_OPERANDS
+        assert answer == sum(operands)
+
+
+def test_chain_multiply_answer_is_correct():
+    from mathpractice_skill import generate_chain_problem
+    for _ in range(ITERATIONS):
+        operands, answer = generate_chain_problem("multiply")
+        expected = 1
+        for o in operands:
+            expected *= o
+        assert answer == expected
+
+
+def test_chain_subtract_never_goes_negative_at_any_intermediate_step():
+    from mathpractice_skill import generate_chain_problem
+    for _ in range(ITERATIONS):
+        operands, answer = generate_chain_problem("subtract")
+        running = operands[0]
+        for delta in operands[1:]:
+            running -= delta
+            assert running >= 0  # every intermediate step, not just the final one
+        assert running == answer
+
+
+def test_chain_divide_divides_evenly_at_every_intermediate_step():
+    from mathpractice_skill import generate_chain_problem
+    for _ in range(ITERATIONS):
+        operands, answer = generate_chain_problem("divide")
+        running = operands[0]
+        for divisor in operands[1:]:
+            assert running % divisor == 0  # every intermediate step, not just the final one
+            running //= divisor
+        assert running == answer
+
+
+def test_chain_unknown_operation_raises():
+    from mathpractice_skill import generate_chain_problem
+    with pytest.raises(ValueError):
+        generate_chain_problem("exponentiate")
+
+
+def test_chain_respects_custom_operand_count():
+    from mathpractice_skill import generate_chain_problem
+    for operation in ("add", "subtract", "multiply", "divide"):
+        operands, answer = generate_chain_problem(operation, n=5)
+        assert len(operands) == 5
+
+
+def _evaluate_mixed(a, op1, b, op2, c):
+    """Reference evaluator for generate_mixed_problem()'s output,
+    independent of how the generator itself computed the answer -
+    infers precedence from which operator is in the 'tight'
+    (multiply/divide) tier vs 'loose' (add/subtract) tier, since
+    exactly one of op1/op2 must be each (see the function it tests)."""
+    ops = {
+        "add": lambda x, y: x + y,
+        "subtract": lambda x, y: x - y,
+        "multiply": lambda x, y: x * y,
+        "divide": lambda x, y: x // y,
+    }
+    tight = {"multiply", "divide"}
+    if op1 in tight and op2 not in tight:
+        return ops[op2](ops[op1](a, b), c)
+    elif op2 in tight and op1 not in tight:
+        return ops[op1](a, ops[op2](b, c))
+    raise AssertionError(f"expected exactly one tight/loose operator, got {op1!r}, {op2!r}")
+
+
+def test_mixed_problem_answer_respects_precedence():
+    from mathpractice_skill import generate_mixed_problem
+    for _ in range(ITERATIONS):
+        a, op1, b, op2, c, answer = generate_mixed_problem()
+        assert answer == _evaluate_mixed(a, op1, b, op2, c)
+
+
+def test_mixed_problem_always_pairs_one_tight_and_one_loose_operator():
+    from mathpractice_skill import generate_mixed_problem
+    tight = {"multiply", "divide"}
+    loose = {"add", "subtract"}
+    for _ in range(ITERATIONS):
+        a, op1, b, op2, c, answer = generate_mixed_problem()
+        assert {op1, op2} & tight
+        assert {op1, op2} & loose
+        assert len({op1, op2} & tight) == 1
+        assert len({op1, op2} & loose) == 1
+
+
+def test_mixed_problem_answer_is_never_negative():
+    from mathpractice_skill import generate_mixed_problem
+    for _ in range(ITERATIONS):
+        a, op1, b, op2, c, answer = generate_mixed_problem()
+        assert answer >= 0
+
+
 def test_addition_table_matches_real_arithmetic():
     from mathpractice_skill import addition_table
     for a, b, answer in addition_table(7):

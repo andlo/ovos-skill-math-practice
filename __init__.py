@@ -59,6 +59,20 @@ difficulty behaves exactly as it did before difficulty existed. See
 DIFFICULTY_RANGES for the actual per-operation, per-tier ranges and
 issue #2 for the design discussion.
 
+CHAINED AND MIXED-OPERATOR PROBLEMS
+-----------------------------------------------------------------
+"quiz me on chained addition" (issue #3) asks a same-operator,
+NUM_CHAIN_OPERANDS-operand question ("what is 7 minus 2 minus 1")
+rather than the usual two-operand one. "quiz me on mixed operators"
+(issue #4) asks a 3-operand question with one +/- operator and one
+x/÷ operator, testing real order-of-operations precedence ("what is 4
+plus 3 times 2" = 10, not 14). Both build their spoken question as
+plain text in Python (_render_expression()) rather than through a
+fixed {a}/{b} dialog, since the operand/operator count is variable -
+see quiz_question_expression.dialog. Neither is difficulty-aware or
+part of OPERATIONS/ALL_OPERATIONS for v1 - deliberately scoped down,
+see NUM_CHAIN_OPERANDS's comment and issues #3/#4 for the reasoning.
+
 ARCHITECTURE NOTE: get_response(), NOT A BACKGROUND THREAD
 -----------------------------------------------------------------
 Unlike ovos-skill-metronome/ovos-skill-rhythm-box/ovos-skill-white-
@@ -143,6 +157,18 @@ DIFFICULTY_RANGES = {
     },
 }
 
+# Chained (issue #3) and mixed-operator (issue #4) problems are NOT
+# difficulty-aware for v1 - deliberately scoped down, same "simple
+# for v1, revisit if it's a real limitation" choice as taught facts
+# staying session-only. They use their own fixed ranges below rather
+# than plugging into DIFFICULTY_RANGES.
+NUM_CHAIN_OPERANDS = 3
+CHAIN_MIN, CHAIN_MAX = 1, 20  # per-leg range for chained add/subtract, mirrors ADD_SUB's medium range
+# smaller than CHAIN_MIN/MAX - keeps a 3-operand product speakable
+# (20*20*20 would be an unwieldy answer to say out loud)
+CHAIN_MULTIPLY_MIN, CHAIN_MULTIPLY_MAX = 2, 9
+CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX = 1, 10  # per-divisor range, mirrors DIVIDE_FACTOR's medium range
+
 # The classic four - what "quiz me on math" / "give me a math quiz"
 # (quiz_general.intent) randomizes across. Deliberately NOT auto-grown
 # by every new operation - see ALL_OPERATIONS below and issue #7's
@@ -209,6 +235,103 @@ def generate_problem(operation, table=None, difficulty="medium"):
         answer = percent * base // 100
         return percent, base, answer
     raise ValueError(f"unknown operation: {operation!r}")
+
+
+def generate_chain_problem(operation, n=NUM_CHAIN_OPERANDS):
+    """Returns (operands, answer) for a same-operator chain of n
+    operands evaluated left to right, e.g. operands=[7, 2, 1] ->
+    answer=4 for subtract ((7-2)-1). subtract and divide are
+    constructed so every INTERMEDIATE step stays valid (non-negative
+    / evenly divides), not just the final result - a naive "pick n
+    numbers independently" chain does NOT guarantee that (see issue
+    #3). Only the classic four chain - percent has no natural chained
+    form."""
+    if operation == "add":
+        operands = [random.randint(CHAIN_MIN, CHAIN_MAX) for _ in range(n)]
+        return operands, sum(operands)
+    elif operation == "multiply":
+        operands = [random.randint(CHAIN_MULTIPLY_MIN, CHAIN_MULTIPLY_MAX) for _ in range(n)]
+        answer = 1
+        for o in operands:
+            answer *= o
+        return operands, answer
+    elif operation == "subtract":
+        # Built forward, not by picking n numbers and hoping: each
+        # delta is capped by the RUNNING total (min(CHAIN_MAX,
+        # running)), so subtraction can never go negative at any
+        # intermediate step, not just the final one.
+        first = random.randint(CHAIN_MIN, CHAIN_MAX)
+        operands = [first]
+        running = first
+        for _ in range(n - 1):
+            delta_max = max(0, min(CHAIN_MAX, running))
+            delta = random.randint(1, delta_max) if delta_max > 0 else 0
+            operands.append(delta)
+            running -= delta
+        return operands, running
+    elif operation == "divide":
+        # Built backward, mirroring generate_problem()'s divide case:
+        # pick the final quotient first, then multiply UP by n-1
+        # random divisors to construct a dividend guaranteed to
+        # divide evenly at every intermediate step, not just overall.
+        quotient = random.randint(CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX)
+        divisors = [random.randint(CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX) for _ in range(n - 1)]
+        dividend = quotient
+        for d in divisors:
+            dividend *= d
+        return [dividend] + divisors, quotient
+    raise ValueError(f"unknown chain operation: {operation!r}")
+
+
+def generate_mixed_problem():
+    """Returns (a, op1, b, op2, c, answer) for a 3-operand expression
+    with exactly one +/- operator and one x/÷ operator (never two
+    from the same precedence tier - that's just a same-operator chain,
+    not an order-of-operations question, see issue #4). op1 is
+    whichever operator is spoken FIRST, left to right - e.g.
+    (a="add", "multiply") means "a plus b times c", evaluated as
+    a + (b*c); (a="multiply", "add") means "a times b plus c",
+    evaluated as (a*b) + c. Constructed, not rejection-sampled, so
+    subtraction/division legs stay non-negative/exact - same
+    philosophy as every other generator in this module."""
+    add_op = random.choice(["add", "subtract"])
+    mul_op = random.choice(["multiply", "divide"])
+    mul_first = random.choice([True, False])
+
+    if mul_first:
+        # (a MUL_OP b) ADD_OP c - spoken "a mul_op b add_op c"
+        if mul_op == "multiply":
+            a = random.randint(CHAIN_MULTIPLY_MIN, CHAIN_MULTIPLY_MAX)
+            b = random.randint(CHAIN_MULTIPLY_MIN, CHAIN_MULTIPLY_MAX)
+            inner = a * b
+        else:
+            b = random.randint(CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX)
+            inner = random.randint(CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX)
+            a = b * inner
+        if add_op == "add":
+            c = random.randint(CHAIN_MIN, CHAIN_MAX)
+            answer = inner + c
+        else:
+            c = random.randint(0, inner)  # keeps inner - c non-negative
+            answer = inner - c
+        return a, mul_op, b, add_op, c, answer
+    else:
+        # a ADD_OP (b MUL_OP c) - spoken "a add_op b mul_op c"
+        if mul_op == "multiply":
+            b = random.randint(CHAIN_MULTIPLY_MIN, CHAIN_MULTIPLY_MAX)
+            c = random.randint(CHAIN_MULTIPLY_MIN, CHAIN_MULTIPLY_MAX)
+            inner = b * c
+        else:
+            c = random.randint(CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX)
+            inner = random.randint(CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX)
+            b = c * inner
+        if add_op == "add":
+            a = random.randint(CHAIN_MIN, CHAIN_MAX)
+            answer = a + inner
+        else:
+            a = inner + random.randint(0, CHAIN_MAX)  # keeps a - inner non-negative
+            answer = a - inner
+        return a, add_op, b, mul_op, c, answer
 
 
 def multiplication_table(n, up_to=10):
@@ -311,6 +434,32 @@ def _load_difficulty_aliases_from_disk():
 DIFFICULTY_ALIASES = _load_difficulty_aliases_from_disk()
 
 
+def _load_operator_words_from_disk():
+    """locale/<lang>/operator_words.json - {operation: spoken word},
+    the REVERSE direction of operation_aliases.json (which maps
+    spoken word -> operation). Needed for chain/mixed-operator
+    quizzing, which builds its question as plain text in Python (see
+    _render_expression()) rather than through a fixed {a}/{b} dialog
+    template, since the number of operands/operators is variable."""
+    merged = {}
+    if not LOCALE_DIR.is_dir():
+        return merged
+    for lang_dir in sorted(LOCALE_DIR.iterdir()):
+        if not lang_dir.is_dir():
+            continue
+        words_file = lang_dir / "operator_words.json"
+        if not words_file.exists():
+            continue
+        with open(words_file, encoding="utf-8") as f:
+            words = json.load(f)
+        lang = lang_dir.name.lower()
+        merged[lang] = {k: v for k, v in words.items() if not k.startswith("_")}
+    return merged
+
+
+OPERATOR_WORDS = _load_operator_words_from_disk()
+
+
 class MathPractice(OVOSSkill):
 
     def initialize(self):
@@ -346,6 +495,41 @@ class MathPractice(OVOSSkill):
         if not raw:
             return None
         return self._difficulty_aliases_for(lang).get(raw.strip().lower())
+
+    def _operator_word(self, operation, lang):
+        lang = lang.lower()
+        words = OPERATOR_WORDS.get(lang) or OPERATOR_WORDS.get("en-us", {})
+        return words.get(operation, operation)
+
+    def _render_expression(self, parts):
+        """parts alternates [operand, operation, operand, operation,
+        ..., operand] (odd length, at least 3). Builds a plain-text
+        arithmetic expression using localized operator words, e.g.
+        '7 minus 2 minus 1' or '4 plus 3 times 2'. Shared by chain
+        and mixed-operator quizzing, both of which need a
+        variable-shape spoken question rather than fixed {a}/{b}
+        dialog slots."""
+        words = []
+        for i, part in enumerate(parts):
+            words.append(str(part) if i % 2 == 0 else self._operator_word(part, self.lang))
+        return " ".join(words)
+
+    def _ask_and_grade_expression(self, parts, answer):
+        """Same grading contract as _ask_and_grade() (speaks
+        correct/incorrect, returns True/False), but for a
+        variable-shape expression rather than a fixed (operation, a,
+        b) triple - see _render_expression()."""
+        expression = self._render_expression(parts)
+        response_text = self.get_response(dialog="quiz_question_expression", data={"expression": expression})
+        if response_text is None:
+            self.speak_dialog("quiz_no_answer")
+            return False
+        user_value = extract_number(response_text, lang=self.lang)
+        if user_value is not False and user_value == answer:
+            self.speak_dialog("quiz_correct")
+            return True
+        self.speak_dialog("quiz_incorrect", {"answer": answer})
+        return False
 
     # ------------------------------------------------------------------
     # Counting
@@ -440,6 +624,32 @@ class MathPractice(OVOSSkill):
                 correct_count += 1
         self.speak_dialog("quiz_finished", {"correct": correct_count, "total": total})
 
+    def _run_chain_quiz(self, operation):
+        """'quiz me on chained addition' etc (issue #3) - see
+        generate_chain_problem() for how the operand list is
+        constructed safely."""
+        correct_count = 0
+        for _ in range(NUM_QUIZ_QUESTIONS):
+            operands, answer = generate_chain_problem(operation)
+            parts = [operands[0]]
+            for operand in operands[1:]:
+                parts.append(operation)
+                parts.append(operand)
+            if self._ask_and_grade_expression(parts, answer):
+                correct_count += 1
+        self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
+
+    def _run_mixed_quiz(self):
+        """'quiz me on mixed operators' (issue #4) - one +/- operator
+        and one x/÷ operator per question, real order-of-operations
+        precedence. See generate_mixed_problem() for construction."""
+        correct_count = 0
+        for _ in range(NUM_QUIZ_QUESTIONS):
+            a, op1, b, op2, c, answer = generate_mixed_problem()
+            if self._ask_and_grade_expression([a, op1, b, op2, c], answer):
+                correct_count += 1
+        self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
+
     @intent_handler("quiz_table.intent")
     def handle_quiz_table(self, message):
         n_raw = message.data.get("number")
@@ -494,6 +704,26 @@ class MathPractice(OVOSSkill):
         a separate pool rather than growing OPERATIONS/quiz_general
         itself."""
         self._run_quiz(random.choice(ALL_OPERATIONS))
+
+    @intent_handler("quiz_chain.intent")
+    def handle_quiz_chain(self, message):
+        """'quiz me on chained addition' (issue #3). Not part of
+        OPERATIONS/ALL_OPERATIONS - a deliberately separate v1 mode,
+        see the module docstring's chain/mixed-operator note."""
+        operation_raw = message.data.get("operation")
+        operation = self._resolve_operation(operation_raw, self.lang) if operation_raw else None
+        if operation_raw and operation is None:
+            self.speak_dialog("operation_not_understood", {"operation": operation_raw})
+            return
+        operation = operation or random.choice(OPERATIONS)
+        self._run_chain_quiz(operation)
+
+    @intent_handler("quiz_mixed.intent")
+    def handle_quiz_mixed(self, message):
+        """'quiz me on mixed operators' (issue #4) - no operation slot,
+        every question mixes a +/- operator with a x/÷ operator by
+        construction (see generate_mixed_problem())."""
+        self._run_mixed_quiz()
 
     # ------------------------------------------------------------------
     # Teach-then-practice (see README "Shared pattern: teach-then-

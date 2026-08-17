@@ -1,0 +1,9 @@
+{
+  "_notes": [
+    "Reverse of operation_aliases.json - {operation: spoken word}. Used to build chain/mixed-operator questions as plain text (see _render_expression() in __init__.py)."
+  ],
+  "add": "plus",
+  "subtract": "minus",
+  "multiply": "times",
+  "divide": "divided by"
+}

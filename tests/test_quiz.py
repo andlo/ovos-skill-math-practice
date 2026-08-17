@@ -152,3 +152,46 @@ def test_quiz_operation_difficulty_unknown_operation_speaks_error(skill):
     skill.speak_dialog.assert_called_once_with(
         "operation_not_understood", {"operation": "calculus"})
     skill.get_response.assert_not_called()
+
+
+def test_quiz_chain_uses_expression_dialog_and_grades_final_answer(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="4")
+    with patch("mathpractice_skill.generate_chain_problem", return_value=([7, 2, 1], 4)):
+        skill.handle_quiz_chain(_msg(operation="subtraction"))
+    dialog_name = skill.get_response.call_args_list[0][1]["dialog"]
+    assert dialog_name == "quiz_question_expression"
+    expression = skill.get_response.call_args_list[0][1]["data"]["expression"]
+    assert expression == "7 minus 2 minus 1"
+    correct_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_correct"]
+    assert len(correct_calls) == 5  # NUM_QUIZ_QUESTIONS, answered correctly every time
+
+
+def test_quiz_chain_unknown_operation_speaks_error(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock()
+    skill.handle_quiz_chain(_msg(operation="calculus"))
+    skill.speak_dialog.assert_called_once_with(
+        "operation_not_understood", {"operation": "calculus"})
+    skill.get_response.assert_not_called()
+
+
+def test_quiz_chain_defaults_to_a_random_operation_when_none_given(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="10")
+    with patch("mathpractice_skill.generate_chain_problem", return_value=([4, 3, 2], 9)):
+        skill.handle_quiz_chain(_msg())
+    assert skill.get_response.call_count == 5
+
+
+def test_quiz_mixed_uses_expression_dialog_and_grades_final_answer(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="10")
+    with patch("mathpractice_skill.generate_mixed_problem", return_value=(4, "add", 3, "multiply", 2, 10)):
+        skill.handle_quiz_mixed(_msg())
+    dialog_name = skill.get_response.call_args_list[0][1]["dialog"]
+    assert dialog_name == "quiz_question_expression"
+    expression = skill.get_response.call_args_list[0][1]["data"]["expression"]
+    assert expression == "4 plus 3 times 2"
+    correct_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_correct"]
+    assert len(correct_calls) == 5
