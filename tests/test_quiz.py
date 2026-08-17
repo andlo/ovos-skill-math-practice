@@ -78,3 +78,43 @@ def test_quiz_general_picks_a_random_operation_and_runs(skill):
     with patch("mathpractice_skill.generate_problem", return_value=(4, 6, 10)):
         skill.handle_quiz_general(_msg())
     assert skill.get_response.call_count == 5
+
+
+def test_quiz_operation_percent_uses_percent_question_dialog(skill):
+    """'quiz me on percentages' resolves via operation_aliases.json
+    straight through the existing generic quiz_operation.intent - no
+    dedicated intent needed, same as any other operation alias."""
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="30")
+    with patch("mathpractice_skill.generate_problem", return_value=(20, 150, 30)):
+        skill.handle_quiz_operation(_msg(operation="percentage"))
+    dialog_name = skill.get_response.call_args_list[0][1]["dialog"]
+    assert dialog_name == "quiz_question_percent"
+
+
+def test_quiz_full_can_pick_percent(skill):
+    """Doesn't assert percent specifically gets chosen (random.choice
+    isn't mocked here) - just that quiz_full runs successfully against
+    the broader ALL_OPERATIONS pool without erroring, and that percent
+    is a legal outcome by construction (see
+    test_all_operations_includes_percent_but_operations_does_not in
+    test_problem_generation.py for the pool membership itself)."""
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="30")
+    with patch("mathpractice_skill.generate_problem", return_value=(20, 150, 30)):
+        skill.handle_quiz_full(_msg())
+    assert skill.get_response.call_count == 5
+
+
+def test_quiz_full_samples_from_all_operations_not_just_the_classic_four(skill):
+    """Confirms handle_quiz_full actually draws from ALL_OPERATIONS
+    (which includes percent), not accidentally from OPERATIONS."""
+    from mathpractice_skill import ALL_OPERATIONS
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="10")
+    with patch("mathpractice_skill.generate_problem", return_value=(4, 6, 10)) as gen, \
+            patch("mathpractice_skill.random.choice") as choice:
+        choice.return_value = "percent"
+        skill.handle_quiz_full(_msg())
+        choice.assert_called_once_with(ALL_OPERATIONS)
+        gen.assert_called_with("percent", None)

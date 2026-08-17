@@ -51,6 +51,28 @@ def test_unknown_operation_raises():
         generate_problem("exponentiate")
 
 
+def test_percent_always_divides_evenly():
+    from mathpractice_skill import generate_problem
+    for _ in range(ITERATIONS):
+        percent, base, answer = generate_problem("percent")
+        assert (percent * base) % 100 == 0
+        assert answer == percent * base // 100
+
+
+def test_percent_within_configured_range():
+    from mathpractice_skill import generate_problem, PERCENT_MIN, PERCENT_MAX
+    for _ in range(ITERATIONS):
+        percent, base, answer = generate_problem("percent")
+        assert PERCENT_MIN <= percent <= PERCENT_MAX
+
+
+def test_all_operations_includes_percent_but_operations_does_not():
+    from mathpractice_skill import OPERATIONS, ALL_OPERATIONS
+    assert "percent" not in OPERATIONS
+    assert "percent" in ALL_OPERATIONS
+    assert set(ALL_OPERATIONS) == set(OPERATIONS) | {"percent"}
+
+
 def test_addition_table_matches_real_arithmetic():
     from mathpractice_skill import addition_table
     for a, b, answer in addition_table(7):

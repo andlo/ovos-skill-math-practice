@@ -2,7 +2,7 @@
 
 Math practice for kids (and anyone else) - counting, times table
 recitation, and interactive arithmetic quizzes across all four basic
-operations. Fully offline.
+operations plus percentages. Fully offline.
 
 [![Tests](https://github.com/andlo/ovos-skill-math-practice/actions/workflows/test.yml/badge.svg)](https://github.com/andlo/ovos-skill-math-practice/actions/workflows/test.yml)
 [![PyPI version](https://img.shields.io/pypi/v/ovos-skill-math-practice.svg)](https://pypi.org/project/ovos-skill-math-practice/)
@@ -24,11 +24,20 @@ operations. Fully offline.
    not arbitrary random problems, and in the SAME operation that was
    taught. See "Teach-then-practice" below.
 4. **Quiz** - `"quiz me on the 3 times table"` / `"quiz me on
-   addition"` - genuinely interactive: asks 5 questions one at a
-   time, listens for a spoken answer, and reports a final score.
-   Covers all four basic operations, not just multiplication - this
-   was an explicit scope correction from the original "times tables"
-   framing during design.
+   addition"` / `"quiz me on percentages"` - genuinely interactive:
+   asks 5 questions one at a time, listens for a spoken answer, and
+   reports a final score. Covers all four basic operations plus
+   percentages, not just multiplication - this was an explicit scope
+   correction from the original "times tables" framing during design.
+
+`"give me a math quiz"` randomizes across the classic four operations
+only, same as it always has. `"give me a full math quiz"` randomizes
+across every operation this skill knows (currently the classic four
+plus percentages) - a separate, broader pool so new operations don't
+retroactively change what the classic phrase means. See the
+`ALL_OPERATIONS` / `OPERATIONS` module comment in `__init__.py` and
+[issue #7](https://github.com/andlo/ovos-skill-math-practice/issues/7)
+for the reasoning.
 
 ## Usage
 ```
@@ -41,13 +50,17 @@ operations. Fully offline.
 "quiz me on what you taught me"
 "quiz me on the 3 times table"
 "quiz me on addition"
+"quiz me on percentages"
 "give me a math quiz"
+"give me a full math quiz"
 "tæl til ti"                    (Danish)
 "sig 5 tabellen"                (Danish)
 "lær mig 5 tabellen"            (Danish)
 "lær mig plus for 5"            (Danish)
 "quiz mig i det du lærte mig"   (Danish)
 "quiz mig i 3 tabellen"         (Danish)
+"quiz mig i procent"            (Danish)
+"quiz mig i det hele"           (Danish)
 ```
 
 ## Teach-then-practice
@@ -101,6 +114,13 @@ unparseable answer counts as incorrect rather than crashing the quiz.
 - Division: always divides evenly (built as divisor × quotient, both
   1-10) - no fractional answers, since spoken fraction-checking is a
   much harder problem than this skill attempts to solve.
+- Percentage: built backwards like division - the percentage (1-100)
+  is picked first, then a base is constructed that's guaranteed to
+  make `percent/100*base` a whole number, rather than picking both
+  numbers freely and rounding. No tolerance/rounding needed for v1
+  (see [issue #5](https://github.com/andlo/ovos-skill-math-practice/issues/5)
+  for the tolerance-band question decimals/fractions will eventually
+  raise).
 
 ## Install
 ```bash

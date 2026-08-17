@@ -1,9 +1,12 @@
 {
   "_notes": [
-    "Keys are the spoken operation name, values are the key in OPERATIONS (__init__.py)."
+    "Keys are the spoken operation name, values are the key in OPERATIONS or ALL_OPERATIONS (__init__.py). 'percent' is valid for direct quiz_operation.intent requests ('quiz me on percentages') even though it's not in the classic OPERATIONS pool used by quiz_general.intent."
   ],
   "addition": "add",
   "subtraction": "subtract",
   "multiplication": "multiply",
-  "division": "divide"
+  "division": "divide",
+  "percent": "percent",
+  "percentage": "percent",
+  "percentages": "percent"
 }

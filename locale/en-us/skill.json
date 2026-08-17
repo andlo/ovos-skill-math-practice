@@ -6,11 +6,13 @@
   "license": "GPL-3.0-or-later",
   "author": "andlo",
   "name": "Math Practice",
-  "description": "Math practice for kids - counting, times table recitation, and interactive quizzes across addition, subtraction, multiplication, and division. Fully offline.",
+  "description": "Math practice for kids - counting, times table recitation, and interactive quizzes across addition, subtraction, multiplication, division, and percentages. Fully offline.",
   "examples": [
     "count to ten",
     "say the 5 times table",
-    "quiz me on the 3 times table"
+    "quiz me on the 3 times table",
+    "quiz me on percentages",
+    "give me a full math quiz"
   ],
   "tags": [
     "math",

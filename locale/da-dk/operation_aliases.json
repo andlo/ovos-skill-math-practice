@@ -8,5 +8,7 @@
   "minus": "subtract",
   "multiplikation": "multiply",
   "gange": "multiply",
-  "division": "divide"
+  "division": "divide",
+  "procent": "percent",
+  "procenter": "percent"
 }

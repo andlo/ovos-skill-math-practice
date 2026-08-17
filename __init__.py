@@ -34,6 +34,18 @@ intent:
    multiplication - this was an explicit scope correction from the
    original "times tables" framing.
 
+PERCENT AND THE TWO OPERATION POOLS
+-----------------------------------------------------------------
+Percentage ("what is 20 percent of 150") quizzes the same way as the
+classic four via "quiz me on percentages", but is deliberately NOT
+part of OPERATIONS - the pool "give me a math quiz" randomizes
+across. It only joins the broader ALL_OPERATIONS pool, sampled by
+"give me a full math quiz". This keeps "give me a math quiz" meaning
+exactly what it always has, while giving later additions (chained
+problems, mixed-operator, estimation mode - see the open design
+issues) a pool to land in without a retroactive behavior change each
+time. See the ALL_OPERATIONS comment below for the full reasoning.
+
 ARCHITECTURE NOTE: get_response(), NOT A BACKGROUND THREAD
 -----------------------------------------------------------------
 Unlike ovos-skill-metronome/ovos-skill-rhythm-box/ovos-skill-white-
@@ -60,6 +72,7 @@ PROBLEM GENERATION DEFAULTS (state your assumptions, then build)
 """
 
 import json
+import math
 import random
 from pathlib import Path
 
@@ -72,8 +85,23 @@ COUNT_MAX = 100  # sanity cap for "count to X" - not a hard product limit, just 
 TABLE_MIN, TABLE_MAX = 1, 12
 ADD_SUB_MIN, ADD_SUB_MAX = 1, 20
 DIVIDE_FACTOR_MIN, DIVIDE_FACTOR_MAX = 1, 10
+PERCENT_MIN, PERCENT_MAX = 1, 100
+# mirrors DIVIDE_FACTOR's 1-10 "how many times the smallest valid base" range
+PERCENT_BASE_MULTIPLIER_MIN, PERCENT_BASE_MULTIPLIER_MAX = 1, 10
 
+# The classic four - what "quiz me on math" / "give me a math quiz"
+# (quiz_general.intent) randomizes across. Deliberately NOT auto-grown
+# by every new operation - see ALL_OPERATIONS below and issue #7's
+# discussion of why percent stays out of this pool by design.
 OPERATIONS = ["add", "subtract", "multiply", "divide"]
+
+# Every operation this skill can quiz on, including ones with their own
+# dedicated architecture (percent has no fact-table/teach-mode
+# equivalent). "give me a full math quiz" (quiz_full.intent) samples
+# from this broader pool; the classic OPERATIONS pool above is
+# untouched by additions here, so new operations don't retroactively
+# change what "give me a math quiz" means.
+ALL_OPERATIONS = OPERATIONS + ["percent"]
 
 
 def generate_problem(operation, table=None):
@@ -99,6 +127,20 @@ def generate_problem(operation, table=None):
         quotient = random.randint(DIVIDE_FACTOR_MIN, DIVIDE_FACTOR_MAX)
         dividend = divisor * quotient
         return dividend, divisor, quotient
+    elif operation == "percent":
+        # constructed backwards, like divide: pick the percentage
+        # first, then build a base that's guaranteed to make
+        # percent/100*base an integer, rather than picking both
+        # numbers freely and hoping - same "always divides evenly"
+        # rule as divide, no rounding/tolerance needed for v1 (see
+        # issue #5 for the tolerance-band discussion that decimals/
+        # fractions will eventually need).
+        percent = random.randint(PERCENT_MIN, PERCENT_MAX)
+        smallest_valid_base = 100 // math.gcd(percent, 100)
+        base = smallest_valid_base * random.randint(
+            PERCENT_BASE_MULTIPLIER_MIN, PERCENT_BASE_MULTIPLIER_MAX)
+        answer = percent * base // 100
+        return percent, base, answer
     raise ValueError(f"unknown operation: {operation!r}")
 
 
@@ -317,6 +359,14 @@ class MathPractice(OVOSSkill):
     @intent_handler("quiz_general.intent")
     def handle_quiz_general(self, message):
         self._run_quiz(random.choice(OPERATIONS))
+
+    @intent_handler("quiz_full.intent")
+    def handle_quiz_full(self, message):
+        """Samples across ALL_OPERATIONS rather than just the classic
+        four - see the ALL_OPERATIONS module comment for why this is
+        a separate pool rather than growing OPERATIONS/quiz_general
+        itself."""
+        self._run_quiz(random.choice(ALL_OPERATIONS))
 
     # ------------------------------------------------------------------
     # Teach-then-practice (see README "Shared pattern: teach-then-

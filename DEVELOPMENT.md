@@ -39,11 +39,23 @@ exactly the recorded taught facts rather than fresh random ones.
    evenly" constraint).
 2. Add `locale/en-us/quiz_question_<op>.dialog` and the Danish
    equivalent.
-3. Add the operation name to `OPERATIONS` and to both languages'
-   `operation_aliases.json`.
-4. Add `test_problem_generation.py` invariant tests (run many
-   iterations, not just one) and a `test_quiz.py` case confirming the
-   right question dialog gets used.
+3. Add the operation name to both languages' `operation_aliases.json`
+   so `"quiz me on <op>"` (`quiz_operation.intent`) works directly -
+   this alone is enough for the operation to be quizzable.
+4. Decide which pool(s) it joins:
+   - `ALL_OPERATIONS` always - this is what `"give me a full math
+     quiz"` (`quiz_full.intent`) samples from, and should include
+     every operation the skill knows.
+   - `OPERATIONS` only if it belongs in the *classic* random pool
+     that `"give me a math quiz"` (`quiz_general.intent`) has always
+     meant - adding here changes existing behavior for anyone using
+     that phrase, so treat it as a deliberate decision, not a
+     default. Percent (issue #7) is the precedent for staying out of
+     `OPERATIONS` while still being in `ALL_OPERATIONS`.
+5. Add `test_problem_generation.py` invariant tests (run many
+   iterations, not just one), a `test_quiz.py` case confirming the
+   right question dialog gets used, and a case confirming which
+   pool(s) the operation ended up in.
 
 ## Versioning
 

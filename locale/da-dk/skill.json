@@ -6,11 +6,13 @@
   "license": "GPL-3.0-or-later",
   "author": "andlo",
   "name": "Regnetræning",
-  "description": "Regnetræning til børn - tælle, tabel-recitation, og interaktive quizzer i plus, minus, gange og division. Fuldstændig offline.",
+  "description": "Regnetræning til børn - tælle, tabel-recitation, og interaktive quizzer i plus, minus, gange, division og procent. Fuldstændig offline.",
   "examples": [
     "tæl til ti",
     "sig 5 tabellen",
-    "quiz mig i 3 tabellen"
+    "quiz mig i 3 tabellen",
+    "quiz mig i procent",
+    "quiz mig i det hele"
   ],
   "tags": [
     "matematik",
