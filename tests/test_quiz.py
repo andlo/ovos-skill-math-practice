@@ -195,3 +195,70 @@ def test_quiz_mixed_uses_expression_dialog_and_grades_final_answer(skill):
     assert expression == "4 plus 3 times 2"
     correct_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_correct"]
     assert len(correct_calls) == 5
+
+
+def _fixed_estimate_problem():
+    """a=350, operation=multiply, b=5500, answer=1925000, with two
+    fixed distractors at indices 0 and 2, correct answer at index 1 -
+    a deterministic stand-in for generate_estimate_problem()."""
+    choices = [999999, 1925000, 3850000]
+    return 350, "multiply", 5500, 1925000, choices, 1
+
+
+def test_quiz_estimate_speaks_expression_and_all_three_lettered_choices(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="B")
+    skill.voc_match = MagicMock(side_effect=lambda utt, voc: voc == "choice_b" and utt == "B")
+    with patch("mathpractice_skill.generate_estimate_problem", return_value=_fixed_estimate_problem()):
+        skill.handle_quiz_estimate(_msg())
+    dialog_name = skill.get_response.call_args_list[0][1]["dialog"]
+    data = skill.get_response.call_args_list[0][1]["data"]
+    assert dialog_name == "quiz_question_estimate"
+    assert data["expression"] == "350 times 5500"
+    assert data["choice_a"] == 999999
+    assert data["choice_b"] == 1925000
+    assert data["choice_c"] == 3850000
+
+
+def test_quiz_estimate_correct_letter_answer_is_graded_correct(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="B")
+    skill.voc_match = MagicMock(side_effect=lambda utt, voc: voc == "choice_b" and utt == "B")
+    with patch("mathpractice_skill.generate_estimate_problem", return_value=_fixed_estimate_problem()):
+        skill.handle_quiz_estimate(_msg())
+    correct_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_correct"]
+    assert len(correct_calls) == 5
+
+
+def test_quiz_estimate_correct_number_spoken_instead_of_letter_still_counts(skill):
+    """Saying the number itself ('1925000') instead of the letter
+    should still be graded correct, per issue #8's fallback."""
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="1925000")
+    skill.voc_match = MagicMock(return_value=False)  # doesn't match any letter voc
+    with patch("mathpractice_skill.generate_estimate_problem", return_value=_fixed_estimate_problem()):
+        skill.handle_quiz_estimate(_msg())
+    correct_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_correct"]
+    assert len(correct_calls) == 5
+
+
+def test_quiz_estimate_wrong_letter_speaks_estimate_incorrect_with_correct_choice(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="A")
+    skill.voc_match = MagicMock(side_effect=lambda utt, voc: voc == "choice_a" and utt == "A")
+    with patch("mathpractice_skill.generate_estimate_problem", return_value=_fixed_estimate_problem()):
+        skill.handle_quiz_estimate(_msg())
+    incorrect_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "estimate_incorrect"]
+    assert len(incorrect_calls) == 5
+    assert incorrect_calls[0] == (("estimate_incorrect", {"letter": "B", "value": 1925000}), {})
+
+
+def test_quiz_estimate_no_response_counts_as_wrong_but_does_not_crash(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value=None)
+    with patch("mathpractice_skill.generate_estimate_problem", return_value=_fixed_estimate_problem()):
+        skill.handle_quiz_estimate(_msg())
+    no_answer_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_no_answer"]
+    assert len(no_answer_calls) == 5
+    final_call = skill.speak_dialog.call_args_list[-1]
+    assert final_call == (("quiz_finished", {"correct": 0, "total": 5}), {})

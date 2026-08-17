@@ -73,6 +73,18 @@ see quiz_question_expression.dialog. Neither is difficulty-aware or
 part of OPERATIONS/ALL_OPERATIONS for v1 - deliberately scoped down,
 see NUM_CHAIN_OPERANDS's comment and issues #3/#4 for the reasoning.
 
+ESTIMATION MODE
+-----------------------------------------------------------------
+"quiz me on estimation" (issue #8) asks a large-number multiplication
+or division question with THREE lettered choices (A/B/C) instead of
+a computed spoken number - avoids requiring an unwieldy 8-digit
+answer to be spoken and grades a letter (or the presented number
+itself) instead. The two wrong choices are built from specific,
+plausible estimation mistakes (a decimal-place slip; recomputing with
+one factor rounded), not random noise - see
+generate_estimate_problem(). Also not difficulty-aware or part of
+OPERATIONS/ALL_OPERATIONS for v1.
+
 ARCHITECTURE NOTE: get_response(), NOT A BACKGROUND THREAD
 -----------------------------------------------------------------
 Unlike ovos-skill-metronome/ovos-skill-rhythm-box/ovos-skill-white-
@@ -168,6 +180,18 @@ CHAIN_MIN, CHAIN_MAX = 1, 20  # per-leg range for chained add/subtract, mirrors 
 # (20*20*20 would be an unwieldy answer to say out loud)
 CHAIN_MULTIPLY_MIN, CHAIN_MULTIPLY_MAX = 2, 9
 CHAIN_DIVIDE_MIN, CHAIN_DIVIDE_MAX = 1, 10  # per-divisor range, mirrors DIVIDE_FACTOR's medium range
+
+# Estimation mode (issue #8) - large-number multiple-choice, not a
+# computed spoken number. Applies to multiply/divide only (the
+# pedagogical need - "is this roughly right" number sense - doesn't
+# apply the same way to small add/subtract results).
+ESTIMATE_NUM_CHOICES = 3
+ESTIMATE_LETTERS = ["A", "B", "C"]  # length must match ESTIMATE_NUM_CHOICES
+ESTIMATE_OPERATIONS = ["multiply", "divide"]
+ESTIMATE_MULTIPLY_A_MIN, ESTIMATE_MULTIPLY_A_MAX = 100, 999
+ESTIMATE_MULTIPLY_B_MIN, ESTIMATE_MULTIPLY_B_MAX = 1000, 9999
+ESTIMATE_DIVIDE_DIVISOR_MIN, ESTIMATE_DIVIDE_DIVISOR_MAX = 10, 99
+ESTIMATE_DIVIDE_QUOTIENT_MIN, ESTIMATE_DIVIDE_QUOTIENT_MAX = 100, 9999
 
 # The classic four - what "quiz me on math" / "give me a math quiz"
 # (quiz_general.intent) randomizes across. Deliberately NOT auto-grown
@@ -332,6 +356,76 @@ def generate_mixed_problem():
             a = inner + random.randint(0, CHAIN_MAX)  # keeps a - inner non-negative
             answer = a - inner
         return a, add_op, b, mul_op, c, answer
+
+
+def _round_to_nice(n, base):
+    """Rounds n to the nearest multiple of base, never to 0 (falls
+    back to base itself) - used to build a 'rounded one factor before
+    computing' estimation distractor (issue #8), not just noise. e.g.
+    _round_to_nice(5273, 500) -> 5500."""
+    rounded = round(n / base) * base
+    return rounded if rounded != 0 else base
+
+
+def _dedupe_candidates(candidates):
+    """Nudges any duplicate values up by 1 until every value in the
+    list is distinct - collisions between the real answer and a
+    distractor are extremely unlikely given the magnitudes involved
+    here, but a multiple-choice question can never present two
+    identical options."""
+    seen = set()
+    unique = []
+    for value in candidates:
+        while value in seen:
+            value += 1
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
+def generate_estimate_problem():
+    """Returns (a, operation, b, answer, choices, correct_index) for
+    a large-number multiple-choice estimation question (issue #8) -
+    genuinely different from the regular quiz: the user picks a
+    letter, not a computed spoken number (an 8-digit answer read
+    aloud is both awkward to say and a harder STT case than a 2-digit
+    one). `choices` is ESTIMATE_NUM_CHOICES candidate values (the
+    real answer plus DISTRACTORS built from two plausible estimation
+    mistakes, not random noise), already shuffled; `correct_index`
+    says which slot holds the real answer.
+
+    Distractor strategies (both used, not randomly chosen among many,
+    so every question exercises both):
+    1. A decimal-place slip - the real answer x10 or /10, the classic
+       "moved the decimal/forgot a zero" mistake.
+    2. A rounding-based near-miss - recompute with ONE factor rounded
+       to a nearby 'nice' number instead of the exact one, a genuine
+       mis-estimate rather than an arbitrary offset.
+    """
+    operation = random.choice(ESTIMATE_OPERATIONS)
+    if operation == "multiply":
+        a = random.randint(ESTIMATE_MULTIPLY_A_MIN, ESTIMATE_MULTIPLY_A_MAX)
+        b = random.randint(ESTIMATE_MULTIPLY_B_MIN, ESTIMATE_MULTIPLY_B_MAX)
+        answer = a * b
+        distractor_1 = answer * 10 if random.choice([True, False]) else max(1, answer // 10)
+        if random.choice([True, False]):
+            distractor_2 = _round_to_nice(a, 100) * b
+        else:
+            distractor_2 = a * _round_to_nice(b, 500)
+    else:  # divide - built backward so it always divides evenly, same as generate_problem()
+        divisor = random.randint(ESTIMATE_DIVIDE_DIVISOR_MIN, ESTIMATE_DIVIDE_DIVISOR_MAX)
+        quotient = random.randint(ESTIMATE_DIVIDE_QUOTIENT_MIN, ESTIMATE_DIVIDE_QUOTIENT_MAX)
+        a = divisor * quotient
+        b = divisor
+        answer = quotient
+        distractor_1 = quotient * 10 if random.choice([True, False]) else max(1, quotient // 10)
+        distractor_2 = a // _round_to_nice(divisor, 10)
+
+    answer, distractor_1, distractor_2 = _dedupe_candidates([answer, distractor_1, distractor_2])
+    choices = [answer, distractor_1, distractor_2]
+    random.shuffle(choices)
+    correct_index = choices.index(answer)
+    return a, operation, b, answer, choices, correct_index
 
 
 def multiplication_table(n, up_to=10):
@@ -531,6 +625,39 @@ class MathPractice(OVOSSkill):
         self.speak_dialog("quiz_incorrect", {"answer": answer})
         return False
 
+    def _grade_estimate_response(self, response_text, choices, correct_index):
+        """Accepts either a spoken letter (voc-matched against
+        choice_a/b/c.voc) or the spoken number itself (extract_number,
+        matched against the presented choice values) - a user reading
+        the number back out loud instead of the letter should still
+        count, even though the whole point of letters is to avoid
+        REQUIRING that (see issue #8)."""
+        for i, letter in enumerate(ESTIMATE_LETTERS):
+            if self.voc_match(response_text, f"choice_{letter.lower()}"):
+                return i == correct_index
+        user_value = extract_number(response_text, lang=self.lang)
+        if user_value is not False and user_value in choices:
+            return choices.index(user_value) == correct_index
+        return False
+
+    def _ask_and_grade_estimate(self, a, operation, b, choices, correct_index):
+        expression = self._render_expression([a, operation, b])
+        data = {"expression": expression}
+        for letter, value in zip(ESTIMATE_LETTERS, choices):
+            data[f"choice_{letter.lower()}"] = value
+        response_text = self.get_response(dialog="quiz_question_estimate", data=data)
+        if response_text is None:
+            self.speak_dialog("quiz_no_answer")
+            return False
+        if self._grade_estimate_response(response_text, choices, correct_index):
+            self.speak_dialog("quiz_correct")
+            return True
+        self.speak_dialog("estimate_incorrect", {
+            "letter": ESTIMATE_LETTERS[correct_index],
+            "value": choices[correct_index],
+        })
+        return False
+
     # ------------------------------------------------------------------
     # Counting
     # ------------------------------------------------------------------
@@ -650,6 +777,16 @@ class MathPractice(OVOSSkill):
                 correct_count += 1
         self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
 
+    def _run_estimate_quiz(self):
+        """'quiz me on estimation' (issue #8) - multiple choice, not a
+        computed spoken number. See generate_estimate_problem()."""
+        correct_count = 0
+        for _ in range(NUM_QUIZ_QUESTIONS):
+            a, operation, b, answer, choices, correct_index = generate_estimate_problem()
+            if self._ask_and_grade_estimate(a, operation, b, choices, correct_index):
+                correct_count += 1
+        self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
+
     @intent_handler("quiz_table.intent")
     def handle_quiz_table(self, message):
         n_raw = message.data.get("number")
@@ -724,6 +861,14 @@ class MathPractice(OVOSSkill):
         every question mixes a +/- operator with a x/÷ operator by
         construction (see generate_mixed_problem())."""
         self._run_mixed_quiz()
+
+    @intent_handler("quiz_estimate.intent")
+    def handle_quiz_estimate(self, message):
+        """'quiz me on estimation' (issue #8) - no operation slot,
+        samples multiply/divide per question (see
+        generate_estimate_problem()). Not part of OPERATIONS/
+        ALL_OPERATIONS, same v1 scoping as chain/mixed."""
+        self._run_estimate_quiz()
 
     # ------------------------------------------------------------------
     # Teach-then-practice (see README "Shared pattern: teach-then-

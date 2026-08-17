@@ -251,6 +251,54 @@ def test_mixed_problem_answer_is_never_negative():
         assert answer >= 0
 
 
+def test_estimate_problem_has_right_number_of_unique_choices():
+    from mathpractice_skill import generate_estimate_problem, ESTIMATE_NUM_CHOICES
+    for _ in range(ITERATIONS):
+        a, operation, b, answer, choices, correct_index = generate_estimate_problem()
+        assert len(choices) == ESTIMATE_NUM_CHOICES
+        assert len(set(choices)) == ESTIMATE_NUM_CHOICES  # no duplicate options
+
+
+def test_estimate_problem_correct_index_points_at_the_real_answer():
+    from mathpractice_skill import generate_estimate_problem
+    for _ in range(ITERATIONS):
+        a, operation, b, answer, choices, correct_index = generate_estimate_problem()
+        assert choices[correct_index] == answer
+
+
+def test_estimate_problem_answer_matches_the_actual_arithmetic():
+    from mathpractice_skill import generate_estimate_problem
+    for _ in range(ITERATIONS):
+        a, operation, b, answer, choices, correct_index = generate_estimate_problem()
+        if operation == "multiply":
+            assert answer == a * b
+        else:
+            assert a % b == 0
+            assert answer == a // b
+
+
+def test_estimate_problem_only_uses_multiply_or_divide():
+    from mathpractice_skill import generate_estimate_problem
+    seen = set()
+    for _ in range(ITERATIONS):
+        a, operation, b, answer, choices, correct_index = generate_estimate_problem()
+        seen.add(operation)
+    assert seen == {"multiply", "divide"}  # both should appear over enough iterations
+
+
+def test_round_to_nice_never_returns_zero():
+    from mathpractice_skill import _round_to_nice
+    assert _round_to_nice(1, 500) != 0
+    assert _round_to_nice(49, 100) != 0
+
+
+def test_dedupe_candidates_produces_all_distinct_values():
+    from mathpractice_skill import _dedupe_candidates
+    result = _dedupe_candidates([100, 100, 100])
+    assert len(set(result)) == 3
+    assert result[0] == 100  # first occurrence is never touched
+
+
 def test_addition_table_matches_real_arithmetic():
     from mathpractice_skill import addition_table
     for a, b, answer in addition_table(7):

@@ -74,6 +74,22 @@ Neither mode is difficulty-aware or part of `OPERATIONS`/
 `ALL_OPERATIONS` for v1 - a deliberate, scoped-down choice, not an
 oversight.
 
+## Estimation mode
+
+`"quiz me on estimation"` / `"quiz mig i estimering"` asks a
+large-number multiplication or division question with three lettered
+choices (A/B/C) instead of a computed spoken number - avoids
+requiring an unwieldy 8-digit answer to be spoken, and lets the user
+answer with either the letter or the number itself. The two wrong
+choices are built from specific, plausible estimation mistakes (a
+decimal-place slip; recomputing with one factor rounded to a nearby
+"nice" number), not random noise - see
+[issue #8](https://github.com/andlo/ovos-skill-math-practice/issues/8)
+and `generate_estimate_problem()` in `__init__.py`. Whether three
+choices is the right number for a voice-only interaction (vs. glancing
+at a screen) is flagged as an open question in the issue itself -
+worth testing on a live instance.
+
 ## Usage
 ```
 "count to ten"
@@ -89,6 +105,7 @@ oversight.
 "quiz me on hard addition"
 "quiz me on chained subtraction"
 "quiz me on mixed operators"
+"quiz me on estimation"
 "give me a math quiz"
 "give me a full math quiz"
 "tæl til ti"                    (Danish)
@@ -101,6 +118,7 @@ oversight.
 "quiz mig i svær division"      (Danish)
 "quiz mig i kædet subtraktion"  (Danish)
 "quiz mig i blandede regnearter" (Danish)
+"quiz mig i estimering"         (Danish)
 "quiz mig i det hele"           (Danish)
 ```
 

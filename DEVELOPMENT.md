@@ -105,6 +105,25 @@ If a future variable-shape mode needs different final-answer grading
 function - `_ask_and_grade_expression()` assumes a single numeric
 answer, same as everything else in this skill so far.
 
+## Multiple-choice questions (estimation)
+
+`generate_estimate_problem()` (issue #8) is the one mode so far that
+doesn't grade a free-form spoken number at all - the user answers
+with a letter (or, as a fallback, the number itself). If a future
+mode needs multiple choice again:
+
+- Build distractors from SPECIFIC, named wrong-answer strategies
+  (see `_round_to_nice()`'s docstring), not `answer ± random%`- a
+  plausible mistake teaches something, arbitrary noise doesn't.
+- Run every candidate through `_dedupe_candidates()` before
+  presenting - a multiple-choice question can never show two
+  identical options, however unlikely a collision is at your
+  magnitudes.
+- Add one `choice_<letter>.voc` per option (see `choice_a.voc`
+  /`choice_b.voc`/`choice_c.voc`) so `voc_match()` can resolve a
+  spoken letter the same way `repeat.voc` already does for
+  teach-then-practice.
+
 ## Versioning
 
 `version.py` follows `VERSION_MAJOR.VERSION_MINOR.VERSION_BUILD[aVERSION_ALPHA]`.
