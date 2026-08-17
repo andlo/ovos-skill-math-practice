@@ -1,0 +1,11 @@
+{
+  "_notes": [
+    "Nogle STT-motorer normaliserer 'æ' anderledes, derfor både 'svær' og 'svaer'."
+  ],
+  "nem": "easy",
+  "let": "easy",
+  "mellem": "medium",
+  "middel": "medium",
+  "svær": "hard",
+  "svaer": "hard"
+}

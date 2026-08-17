@@ -117,4 +117,38 @@ def test_quiz_full_samples_from_all_operations_not_just_the_classic_four(skill):
         choice.return_value = "percent"
         skill.handle_quiz_full(_msg())
         choice.assert_called_once_with(ALL_OPERATIONS)
-        gen.assert_called_with("percent", None)
+        gen.assert_called_with("percent", None, "medium")
+
+
+def test_quiz_operation_difficulty_passes_difficulty_through(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="10")
+    with patch("mathpractice_skill.generate_problem", return_value=(4, 6, 10)) as gen:
+        skill.handle_quiz_operation_difficulty(_msg(operation="addition", difficulty="hard"))
+        gen.assert_called_with("add", None, "hard")
+
+
+def test_quiz_operation_difficulty_defaults_to_medium_when_no_difficulty_given(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock(return_value="10")
+    with patch("mathpractice_skill.generate_problem", return_value=(4, 6, 10)) as gen:
+        skill.handle_quiz_operation_difficulty(_msg(operation="addition"))
+        gen.assert_called_with("add", None, "medium")
+
+
+def test_quiz_operation_difficulty_unknown_difficulty_speaks_error(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock()
+    skill.handle_quiz_operation_difficulty(_msg(operation="addition", difficulty="impossible"))
+    skill.speak_dialog.assert_called_once_with(
+        "difficulty_not_understood", {"difficulty": "impossible"})
+    skill.get_response.assert_not_called()
+
+
+def test_quiz_operation_difficulty_unknown_operation_speaks_error(skill):
+    skill.speak_dialog = MagicMock()
+    skill.get_response = MagicMock()
+    skill.handle_quiz_operation_difficulty(_msg(operation="calculus", difficulty="hard"))
+    skill.speak_dialog.assert_called_once_with(
+        "operation_not_understood", {"operation": "calculus"})
+    skill.get_response.assert_not_called()

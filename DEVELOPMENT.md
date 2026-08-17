@@ -56,6 +56,32 @@ exactly the recorded taught facts rather than fresh random ones.
    iterations, not just one), a `test_quiz.py` case confirming the
    right question dialog gets used, and a case confirming which
    pool(s) the operation ended up in.
+6. Add a per-difficulty entry for the operation in `DIFFICULTY_RANGES`
+   (`easy`/`medium`/`hard`) - see "Adding difficulty support to a new
+   operation" below if it needs anything beyond a simple `(lo, hi)`
+   tuple (multiply and percent both need more than one).
+
+## Adding difficulty support to a new operation
+
+`DIFFICULTY_RANGES[difficulty][operation]` is usually a simple
+`(lo, hi)` tuple `generate_problem()` calls `random.randint()` on
+directly. If the operation needs more than one range (multiply's
+factor vs. the "other" number, percent's base multiplier), use
+multiple keys instead (see `multiply_factor`/`multiply_other` or
+`percent_multiplier`) rather than overloading a single tuple's
+meaning per-operation - keeps `generate_problem()` legible without
+having to remember which operation's tuple means what.
+
+`"medium"` must always reproduce whatever the operation's original,
+pre-difficulty behavior was - build it FROM existing constants rather
+than a fresh literal, the same way every entry already does, so
+`"quiz me on <op>"` with no difficulty word never changes behavior
+just because difficulty support exists.
+
+Difficulty is per-request only (see `DIFFICULTY_RANGES` module
+comment and issue #2) - don't add a `self.settings`-persisted default
+without a real, demonstrated need for one; that's a deliberate
+scoped-down v1 choice, not an oversight.
 
 ## Versioning
 

@@ -46,6 +46,19 @@ problems, mixed-operator, estimation mode - see the open design
 issues) a pool to land in without a retroactive behavior change each
 time. See the ALL_OPERATIONS comment below for the full reasoning.
 
+DIFFICULTY: PER-REQUEST ONLY, NOT PERSISTED
+-----------------------------------------------------------------
+"quiz me on hard addition" (quiz_operation_difficulty.intent) selects
+one of DIFFICULTIES for that single quiz round only - there's no
+skill-wide default stored in self.settings for v1, matching the same
+"deliberately session-only/simple for v1" choice made for taught
+facts (see below). generate_problem()'s default difficulty is
+"medium", built FROM the existing range constants rather than
+duplicating them, so every call site that doesn't ask for a
+difficulty behaves exactly as it did before difficulty existed. See
+DIFFICULTY_RANGES for the actual per-operation, per-tier ranges and
+issue #2 for the design discussion.
+
 ARCHITECTURE NOTE: get_response(), NOT A BACKGROUND THREAD
 -----------------------------------------------------------------
 Unlike ovos-skill-metronome/ovos-skill-rhythm-box/ovos-skill-white-
@@ -89,6 +102,47 @@ PERCENT_MIN, PERCENT_MAX = 1, 100
 # mirrors DIVIDE_FACTOR's 1-10 "how many times the smallest valid base" range
 PERCENT_BASE_MULTIPLIER_MIN, PERCENT_BASE_MULTIPLIER_MAX = 1, 10
 
+DIFFICULTIES = ["easy", "medium", "hard"]
+
+# Per-operation ranges by difficulty tier. "medium" is deliberately
+# built FROM the constants above rather than duplicated as literals -
+# single source of truth, and it's exactly what every operation
+# already did before difficulty existed, so existing behavior at the
+# default difficulty is unchanged. multiply's ranges are split into
+# the varying factor (used when no explicit table is requested) and
+# the "other" factor (1-10 today) - table quizzing itself
+# (quiz_table.intent) doesn't take a difficulty, only the general
+# multiply operation does. percent only varies its base multiplier by
+# difficulty, not the percentage range itself (1-100 stays constant -
+# a "hard" 97% is not meaningfully harder to compute than an "easy"
+# 10%, but a bigger base number is).
+DIFFICULTY_RANGES = {
+    "easy": {
+        "add": (1, 10),
+        "subtract": (1, 10),
+        "multiply_factor": (2, 5),
+        "multiply_other": (1, 5),
+        "divide": (1, 5),
+        "percent_multiplier": (1, 5),
+    },
+    "medium": {
+        "add": (ADD_SUB_MIN, ADD_SUB_MAX),
+        "subtract": (ADD_SUB_MIN, ADD_SUB_MAX),
+        "multiply_factor": (2, TABLE_MAX),
+        "multiply_other": (1, 10),
+        "divide": (DIVIDE_FACTOR_MIN, DIVIDE_FACTOR_MAX),
+        "percent_multiplier": (PERCENT_BASE_MULTIPLIER_MIN, PERCENT_BASE_MULTIPLIER_MAX),
+    },
+    "hard": {
+        "add": (1, 100),
+        "subtract": (1, 100),
+        "multiply_factor": (2, TABLE_MAX),
+        "multiply_other": (1, 20),
+        "divide": (1, 20),
+        "percent_multiplier": (1, 30),
+    },
+}
+
 # The classic four - what "quiz me on math" / "give me a math quiz"
 # (quiz_general.intent) randomizes across. Deliberately NOT auto-grown
 # by every new operation - see ALL_OPERATIONS below and issue #7's
@@ -104,27 +158,38 @@ OPERATIONS = ["add", "subtract", "multiply", "divide"]
 ALL_OPERATIONS = OPERATIONS + ["percent"]
 
 
-def generate_problem(operation, table=None):
+def generate_problem(operation, table=None, difficulty="medium"):
     """Returns (a, b, correct_answer) for the given operation.
     `table` restricts multiplication to a specific times table (the
-    fixed factor); ignored for other operations."""
+    fixed factor); ignored for other operations. `difficulty` selects
+    the per-operation range from DIFFICULTY_RANGES - "medium" (the
+    default) reproduces the exact ranges this function always used
+    before difficulty existed."""
+    if difficulty not in DIFFICULTY_RANGES:
+        raise ValueError(f"unknown difficulty: {difficulty!r}")
+    ranges = DIFFICULTY_RANGES[difficulty]
     if operation == "multiply":
-        a = table if table else random.randint(2, TABLE_MAX)
-        b = random.randint(1, 10)
+        factor_min, factor_max = ranges["multiply_factor"]
+        other_min, other_max = ranges["multiply_other"]
+        a = table if table else random.randint(factor_min, factor_max)
+        b = random.randint(other_min, other_max)
         return a, b, a * b
     elif operation == "add":
-        a = random.randint(ADD_SUB_MIN, ADD_SUB_MAX)
-        b = random.randint(ADD_SUB_MIN, ADD_SUB_MAX)
+        lo, hi = ranges["add"]
+        a = random.randint(lo, hi)
+        b = random.randint(lo, hi)
         return a, b, a + b
     elif operation == "subtract":
-        a = random.randint(ADD_SUB_MIN, ADD_SUB_MAX)
-        b = random.randint(ADD_SUB_MIN, ADD_SUB_MAX)
+        lo, hi = ranges["subtract"]
+        a = random.randint(lo, hi)
+        b = random.randint(lo, hi)
         if b > a:
             a, b = b, a  # keep the result non-negative, see module docstring
         return a, b, a - b
     elif operation == "divide":
-        divisor = random.randint(DIVIDE_FACTOR_MIN, DIVIDE_FACTOR_MAX)
-        quotient = random.randint(DIVIDE_FACTOR_MIN, DIVIDE_FACTOR_MAX)
+        lo, hi = ranges["divide"]
+        divisor = random.randint(lo, hi)
+        quotient = random.randint(lo, hi)
         dividend = divisor * quotient
         return dividend, divisor, quotient
     elif operation == "percent":
@@ -134,11 +199,13 @@ def generate_problem(operation, table=None):
         # numbers freely and hoping - same "always divides evenly"
         # rule as divide, no rounding/tolerance needed for v1 (see
         # issue #5 for the tolerance-band discussion that decimals/
-        # fractions will eventually need).
+        # fractions will eventually need). Only the base multiplier
+        # varies by difficulty, not the percentage range itself - see
+        # DIFFICULTY_RANGES comment.
         percent = random.randint(PERCENT_MIN, PERCENT_MAX)
         smallest_valid_base = 100 // math.gcd(percent, 100)
-        base = smallest_valid_base * random.randint(
-            PERCENT_BASE_MULTIPLIER_MIN, PERCENT_BASE_MULTIPLIER_MAX)
+        mult_lo, mult_hi = ranges["percent_multiplier"]
+        base = smallest_valid_base * random.randint(mult_lo, mult_hi)
         answer = percent * base // 100
         return percent, base, answer
     raise ValueError(f"unknown operation: {operation!r}")
@@ -218,6 +285,32 @@ def _load_operation_aliases_from_disk():
 OPERATION_ALIASES = _load_operation_aliases_from_disk()
 
 
+def _load_difficulty_aliases_from_disk():
+    """locale/<lang>/difficulty_aliases.json - {spoken difficulty
+    name: key in DIFFICULTIES}. Same convention and loader shape as
+    _load_operation_aliases_from_disk() - kept as a separate function
+    rather than generalizing the two into one, since a shared loader
+    would obscure which alias file backs which resolver for a reader
+    skimming this module."""
+    merged = {}
+    if not LOCALE_DIR.is_dir():
+        return merged
+    for lang_dir in sorted(LOCALE_DIR.iterdir()):
+        if not lang_dir.is_dir():
+            continue
+        alias_file = lang_dir / "difficulty_aliases.json"
+        if not alias_file.exists():
+            continue
+        with open(alias_file, encoding="utf-8") as f:
+            aliases = json.load(f)
+        lang = lang_dir.name.lower()
+        merged[lang] = {k: v for k, v in aliases.items() if not k.startswith("_")}
+    return merged
+
+
+DIFFICULTY_ALIASES = _load_difficulty_aliases_from_disk()
+
+
 class MathPractice(OVOSSkill):
 
     def initialize(self):
@@ -243,6 +336,16 @@ class MathPractice(OVOSSkill):
         if not raw:
             return None
         return self._operation_aliases_for(lang).get(raw.strip().lower())
+
+    def _difficulty_aliases_for(self, lang):
+        lang = lang.lower()
+        return DIFFICULTY_ALIASES.get(lang) or DIFFICULTY_ALIASES.get("en-us", {})
+
+    def _resolve_difficulty(self, raw, lang):
+        """Exact match only - same reasoning as _resolve_operation()."""
+        if not raw:
+            return None
+        return self._difficulty_aliases_for(lang).get(raw.strip().lower())
 
     # ------------------------------------------------------------------
     # Counting
@@ -316,10 +419,10 @@ class MathPractice(OVOSSkill):
         self.speak_dialog("quiz_incorrect", {"answer": answer})
         return False
 
-    def _run_quiz(self, operation, table=None):
+    def _run_quiz(self, operation, table=None, difficulty="medium"):
         correct_count = 0
         for _ in range(NUM_QUIZ_QUESTIONS):
-            a, b, answer = generate_problem(operation, table)
+            a, b, answer = generate_problem(operation, table, difficulty)
             if self._ask_and_grade(operation, a, b, answer):
                 correct_count += 1
         self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
@@ -355,6 +458,30 @@ class MathPractice(OVOSSkill):
             return
         operation = operation or random.choice(OPERATIONS)
         self._run_quiz(operation)
+
+    @intent_handler("quiz_operation_difficulty.intent")
+    def handle_quiz_operation_difficulty(self, message):
+        """'quiz me on hard addition' - separate intent from
+        quiz_operation.intent rather than an optional slot on it,
+        matching this project's existing style of one static-word
+        template per phrasing rather than optional-slot syntax (see
+        e.g. teach_me.intent vs teach_me_operation.intent). Difficulty
+        stays a per-request slot only, not persisted to
+        self.settings - see the module-level DIFFICULTIES/
+        DIFFICULTY_RANGES comment and issue #2 for why."""
+        operation_raw = message.data.get("operation")
+        difficulty_raw = message.data.get("difficulty")
+        operation = self._resolve_operation(operation_raw, self.lang) if operation_raw else None
+        if operation_raw and operation is None:
+            self.speak_dialog("operation_not_understood", {"operation": operation_raw})
+            return
+        difficulty = self._resolve_difficulty(difficulty_raw, self.lang) if difficulty_raw else None
+        if difficulty_raw and difficulty is None:
+            self.speak_dialog("difficulty_not_understood", {"difficulty": difficulty_raw})
+            return
+        operation = operation or random.choice(OPERATIONS)
+        difficulty = difficulty or "medium"
+        self._run_quiz(operation, difficulty=difficulty)
 
     @intent_handler("quiz_general.intent")
     def handle_quiz_general(self, message):

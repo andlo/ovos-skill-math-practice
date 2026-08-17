@@ -1,0 +1,8 @@
+{
+  "_notes": [
+    "Keys are the spoken difficulty name, values are the key in DIFFICULTIES (__init__.py)."
+  ],
+  "easy": "easy",
+  "medium": "medium",
+  "hard": "hard"
+}

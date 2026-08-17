@@ -39,6 +39,19 @@ retroactively change what the classic phrase means. See the
 [issue #7](https://github.com/andlo/ovos-skill-math-practice/issues/7)
 for the reasoning.
 
+## Difficulty
+
+`"quiz me on hard addition"` / `"quiz mig i svær division"` selects
+one of `easy` / `medium` / `hard` for that quiz round only - there's
+no persisted skill-wide default (see
+[issue #2](https://github.com/andlo/ovos-skill-math-practice/issues/2)).
+`"quiz me on addition"` with no difficulty word still works exactly
+as before - it runs at `medium`, which reproduces the original ranges
+every operation always used. See `DIFFICULTY_RANGES` in `__init__.py`
+for the actual per-operation, per-tier ranges. Times-table quizzing
+(`"quiz me on the 5 times table"`) doesn't take a difficulty - the
+table number itself already controls how hard it is.
+
 ## Usage
 ```
 "count to ten"
@@ -51,6 +64,7 @@ for the reasoning.
 "quiz me on the 3 times table"
 "quiz me on addition"
 "quiz me on percentages"
+"quiz me on hard addition"
 "give me a math quiz"
 "give me a full math quiz"
 "tæl til ti"                    (Danish)
@@ -60,6 +74,7 @@ for the reasoning.
 "quiz mig i det du lærte mig"   (Danish)
 "quiz mig i 3 tabellen"         (Danish)
 "quiz mig i procent"            (Danish)
+"quiz mig i svær division"      (Danish)
 "quiz mig i det hele"           (Danish)
 ```
 
@@ -121,6 +136,8 @@ unparseable answer counts as incorrect rather than crashing the quiz.
   (see [issue #5](https://github.com/andlo/ovos-skill-math-practice/issues/5)
   for the tolerance-band question decimals/fractions will eventually
   raise).
+- All of the above are the `medium` difficulty ranges - see
+  "Difficulty" above for `easy`/`hard`.
 
 ## Install
 ```bash
