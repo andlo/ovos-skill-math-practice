@@ -569,6 +569,15 @@ class MathPractice(OVOSSkill):
             return None
         return self._difficulty_aliases_for(lang).get(raw.strip().lower())
 
+    def _difficulty_in(self, utterance, lang):
+        """The first word of `utterance` that is a known difficulty alias
+        for `lang` (quiz_operation_difficulty.intent lists them)."""
+        aliases = self._difficulty_aliases_for(lang)
+        for word in (utterance or "").lower().replace(",", " ").split():
+            if word in aliases:
+                return word
+        return None
+
     def _operator_word(self, operation, lang):
         lang = lang.lower()
         words = OPERATOR_WORDS.get(lang) or OPERATOR_WORDS.get("en-us", {})
@@ -827,7 +836,12 @@ class MathPractice(OVOSSkill):
         self.settings - see the module-level DIFFICULTIES/
         DIFFICULTY_RANGES comment and issue #2 for why."""
         operation_raw = message.data.get("operation")
-        difficulty_raw = message.data.get("difficulty")
+        # The difficulty is a fixed word list in the template, not a slot:
+        # '{difficulty} {operation}' - two slots next to each other - is
+        # rejected by ovos-workshop 9.x (the alpha channel), which dropped
+        # this whole intent there. So it's picked out of the utterance.
+        difficulty_raw = message.data.get("difficulty") or self._difficulty_in(
+            message.data.get("utterance", ""), self.lang)
         operation = self._resolve_operation(operation_raw, self.lang) if operation_raw else None
         if operation_raw and operation is None:
             self.speak_dialog("operation_not_understood", {"operation": operation_raw})
