@@ -35,6 +35,10 @@ import math
 import random
 from pathlib import Path
 
+import functools
+import threading
+
+from ovos_bus_client.session import SessionManager
 from ovos_workshop.skills import OVOSSkill
 from ovos_workshop.decorators import intent_handler
 from ovos_number_parser import extract_number
@@ -533,7 +537,77 @@ def _load_operator_words_from_disk():
 OPERATOR_WORDS = _load_operator_words_from_disk()
 
 
+class QuizStopped(Exception):
+    """Raised inside a quiz or lesson once "stop" was requested for its
+    session, so the question loop ends instead of asking the next one."""
+
+
+def _session_id(message):
+    try:
+        return SessionManager.get(message).session_id
+    except Exception:  # no usable session in the message
+        return "default"
+
+
+def stoppable(handler):
+    """Marks an intent handler as stoppable: while it runs, can_stop()
+    answers True for its session, and a stop for that session makes the
+    next (or current) question end the handler quietly."""
+    @functools.wraps(handler)
+    def wrapper(self, message):
+        sid = _session_id(message)
+        state = self._stop_state()
+        state["active"].add(sid)
+        state["requested"].discard(sid)
+        state["local"].sid = sid
+        try:
+            return handler(self, message)
+        except QuizStopped:
+            self.log.info(f"stopped in session {sid}")
+        finally:
+            state["active"].discard(sid)
+            state["requested"].discard(sid)
+            state["local"].sid = None
+    return wrapper
+
+
 class MathPractice(OVOSSkill):
+
+
+    # ------------------------------------------------------------------
+    # Stop support (session-scoped)
+    # ------------------------------------------------------------------
+
+    def _stop_state(self):
+        state = self.__dict__.get("_stop_state_data")
+        if state is None:
+            state = {"active": set(), "requested": set(), "local": threading.local()}
+            self.__dict__["_stop_state_data"] = state
+        return state
+
+    def _raise_if_stopped(self):
+        state = self._stop_state()
+        sid = getattr(state["local"], "sid", None)
+        if sid is not None and sid in state["requested"]:
+            raise QuizStopped()
+
+    def _ask(self, *args, **kwargs):
+        """get_response() that ends the quiz/lesson once stop was
+        requested - before asking, and after the (then aborted) wait."""
+        self._raise_if_stopped()
+        response = self.get_response(*args, **kwargs)
+        self._raise_if_stopped()
+        return response
+
+    def can_stop(self, message) -> bool:
+        return _session_id(message) in self._stop_state()["active"]
+
+    def stop_session(self, session) -> bool:
+        state = self._stop_state()
+        if session.session_id in state["active"]:
+            state["requested"].add(session.session_id)
+            return True
+        return False
 
     def initialize(self):
         # Session-only, not persisted across restarts - see README
@@ -602,7 +676,7 @@ class MathPractice(OVOSSkill):
         variable-shape expression rather than a fixed (operation, a,
         b) triple - see _render_expression()."""
         expression = self._render_expression(parts)
-        response_text = self.get_response(dialog="quiz_question_expression", data={"expression": expression})
+        response_text = self._ask(dialog="quiz_question_expression", data={"expression": expression})
         if response_text is None:
             self.speak_dialog("quiz_no_answer")
             return False
@@ -633,7 +707,7 @@ class MathPractice(OVOSSkill):
         data = {"expression": expression}
         for letter, value in zip(ESTIMATE_LETTERS, choices):
             data[f"choice_{letter.lower()}"] = value
-        response_text = self.get_response(dialog="quiz_question_estimate", data=data)
+        response_text = self._ask(dialog="quiz_question_estimate", data=data)
         if response_text is None:
             self.speak_dialog("quiz_no_answer")
             return False
@@ -654,7 +728,7 @@ class MathPractice(OVOSSkill):
         Reuses the SAME quiz_question_<op>.dialog files as the
         integer version - they're already number-agnostic {a}/{b}
         templates, no decimal-specific dialog needed."""
-        response_text = self.get_response(dialog=f"quiz_question_{operation}", data={"a": a, "b": b})
+        response_text = self._ask(dialog=f"quiz_question_{operation}", data={"a": a, "b": b})
         if response_text is None:
             self.speak_dialog("quiz_no_answer")
             return False
@@ -670,6 +744,7 @@ class MathPractice(OVOSSkill):
     # ------------------------------------------------------------------
 
     @intent_handler("count_to.intent")
+    @stoppable
     def handle_count_to(self, message):
         n_raw = message.data.get("number")
         n = extract_number(n_raw, lang=self.lang) if n_raw else None
@@ -702,6 +777,7 @@ class MathPractice(OVOSSkill):
         return ". ".join(lines)
 
     @intent_handler("recite_table.intent")
+    @stoppable
     def handle_recite_table(self, message):
         n_raw = message.data.get("number")
         n = extract_number(n_raw, lang=self.lang) if n_raw else None
@@ -718,7 +794,7 @@ class MathPractice(OVOSSkill):
     def _ask_question(self, operation, a, b):
         """Speaks the question and listens for a spoken answer -
         returns the transcribed text, or None on timeout/no response."""
-        return self.get_response(dialog=f"quiz_question_{operation}", data={"a": a, "b": b})
+        return self._ask(dialog=f"quiz_question_{operation}", data={"a": a, "b": b})
 
     def _ask_and_grade(self, operation, a, b, answer):
         """Asks one question and speaks correct/incorrect feedback.
@@ -807,6 +883,7 @@ class MathPractice(OVOSSkill):
         self.speak_dialog("quiz_finished", {"correct": correct_count, "total": NUM_QUIZ_QUESTIONS})
 
     @intent_handler("quiz_table.intent")
+    @stoppable
     def handle_quiz_table(self, message):
         n_raw = message.data.get("number")
         n = extract_number(n_raw, lang=self.lang) if n_raw else None
@@ -816,6 +893,7 @@ class MathPractice(OVOSSkill):
         self._run_quiz("multiply", table=int(n))
 
     @intent_handler("quiz_operation.intent")
+    @stoppable
     def handle_quiz_operation(self, message):
         operation_raw = message.data.get("operation")
         operation = self._resolve_operation(operation_raw, self.lang) if operation_raw else None
@@ -826,6 +904,7 @@ class MathPractice(OVOSSkill):
         self._run_quiz(operation)
 
     @intent_handler("quiz_operation_difficulty.intent")
+    @stoppable
     def handle_quiz_operation_difficulty(self, message):
         """'quiz me on hard addition' - separate intent from
         quiz_operation.intent rather than an optional slot on it,
@@ -855,10 +934,12 @@ class MathPractice(OVOSSkill):
         self._run_quiz(operation, difficulty=difficulty)
 
     @intent_handler("quiz_general.intent")
+    @stoppable
     def handle_quiz_general(self, message):
         self._run_quiz(random.choice(OPERATIONS))
 
     @intent_handler("quiz_full.intent")
+    @stoppable
     def handle_quiz_full(self, message):
         """Samples across ALL_OPERATIONS rather than just the classic
         four - see the ALL_OPERATIONS module comment for why this is
@@ -867,6 +948,7 @@ class MathPractice(OVOSSkill):
         self._run_quiz(random.choice(ALL_OPERATIONS))
 
     @intent_handler("quiz_chain.intent")
+    @stoppable
     def handle_quiz_chain(self, message):
         """'quiz me on chained addition' (issue #3). Not part of
         OPERATIONS/ALL_OPERATIONS - a deliberately separate v1 mode,
@@ -880,6 +962,7 @@ class MathPractice(OVOSSkill):
         self._run_chain_quiz(operation)
 
     @intent_handler("quiz_mixed.intent")
+    @stoppable
     def handle_quiz_mixed(self, message):
         """'quiz me on mixed operators' (issue #4) - no operation slot,
         every question mixes a +/- operator with a x/÷ operator by
@@ -887,6 +970,7 @@ class MathPractice(OVOSSkill):
         self._run_mixed_quiz()
 
     @intent_handler("quiz_estimate.intent")
+    @stoppable
     def handle_quiz_estimate(self, message):
         """'quiz me on estimation' (issue #8) - no operation slot,
         samples multiply/divide per question (see
@@ -895,6 +979,7 @@ class MathPractice(OVOSSkill):
         self._run_estimate_quiz()
 
     @intent_handler("quiz_decimal.intent")
+    @stoppable
     def handle_quiz_decimal(self, message):
         """'quiz me on decimal addition' (issue #5, decimals half -
         fractions are a deliberately separate later pass). Not part
@@ -949,13 +1034,14 @@ class MathPractice(OVOSSkill):
 
             if idx == len(rows) - 1:
                 break
-            response = self.get_response(dialog="continue_teaching_prompt")
+            response = self._ask(dialog="continue_teaching_prompt")
             if response and self.voc_match(response, "repeat"):
                 self.speak(rendered, wait=True)
 
         self.speak_dialog("teaching_finished", {"count": len(self._taught_facts)})
 
     @intent_handler("teach_me.intent")
+    @stoppable
     def handle_teach_me(self, message):
         n_raw = message.data.get("number")
         n = extract_number(n_raw, lang=self.lang) if n_raw else None
@@ -965,6 +1051,7 @@ class MathPractice(OVOSSkill):
         self._teach_facts_for_operation("multiply", int(n))
 
     @intent_handler("teach_me_operation.intent")
+    @stoppable
     def handle_teach_me_operation(self, message):
         operation_raw = message.data.get("operation")
         operation = self._resolve_operation(operation_raw, self.lang) if operation_raw else None
@@ -979,6 +1066,7 @@ class MathPractice(OVOSSkill):
         self._teach_facts_for_operation(operation, int(n))
 
     @intent_handler("quiz_taught.intent")
+    @stoppable
     def handle_quiz_taught(self, message):
         if not self._taught_facts:
             self.speak_dialog("nothing_taught_yet")
