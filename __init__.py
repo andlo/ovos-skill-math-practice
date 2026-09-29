@@ -38,6 +38,7 @@ from pathlib import Path
 import functools
 import threading
 
+from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_workshop.skills import OVOSSkill
 from ovos_workshop.decorators import intent_handler
@@ -606,6 +607,14 @@ class MathPractice(OVOSSkill):
         state = self._stop_state()
         if session.session_id in state["active"]:
             state["requested"].add(session.session_id)
+            # End a get_response() that is waiting right now. Setting the
+            # response to None (what workshop does after a successful stop)
+            # is not enough on ovos-workshop 7.x: the wait loop keeps going.
+            # abort_question is the supported way on 7.x and 9.x alike.
+            self.bus.emit(Message("mycroft.skills.abort_question",
+                                  {"skill_id": self.skill_id},
+                                  {"session": session.serialize(),
+                                   "skill_id": self.skill_id}))
             return True
         return False
 

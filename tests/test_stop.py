@@ -32,6 +32,10 @@ def test_stop_ends_the_quiz_in_that_session(skill):
     assert "quiz_finished" not in said
     assert said.count("quiz_no_answer") == 0
     assert not skill.can_stop(_msg("s1"))  # nothing left to stop
+    aborts = [c[0][0] for c in skill.bus.emit.call_args_list
+              if c[0][0].msg_type == "mycroft.skills.abort_question"]
+    assert len(aborts) == 1 and aborts[0].data["skill_id"] == skill.skill_id
+    assert aborts[0].context["session"]["session_id"] == "s1"
 
 
 def test_stop_for_another_session_does_not_touch_the_quiz(skill):
