@@ -615,6 +615,12 @@ class MathPractice(OVOSSkill):
                                   {"skill_id": self.skill_id},
                                   {"session": session.serialize(),
                                    "skill_id": self.skill_id}))
+            # ovos-workshop 7.x: after the wait is aborted, get_response()
+            # keeps polling its validated answer, which is still [] - so it
+            # never returns. None is what workshop itself sets on "cancel".
+            validated = getattr(self, "_OVOSSkill__validated_responses", None)
+            if isinstance(validated, dict):
+                validated[session.session_id] = None
             return True
         return False
 
