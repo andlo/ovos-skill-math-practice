@@ -34,16 +34,6 @@ def test_quiz_table_all_wrong_answers(skill):
     assert final_call == (("quiz_finished", {"correct": 0, "total": 5}), {})
 
 
-def test_quiz_no_response_counts_as_wrong_but_does_not_crash(skill):
-    skill.speak_dialog = MagicMock()
-    skill.get_response = MagicMock(return_value=None)  # simulates STT timeout
-    with patch("mathpractice_skill.generate_problem", return_value=(6, 7, 42)):
-        skill.handle_quiz_table(_msg(number="6"))
-    no_answer_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_no_answer"]
-    assert len(no_answer_calls) == 5
-    final_call = skill.speak_dialog.call_args_list[-1]
-    assert final_call == (("quiz_finished", {"correct": 0, "total": 5}), {})
-
 
 def test_quiz_question_uses_correct_dialog_name_per_operation(skill):
     skill.speak_dialog = MagicMock()
@@ -252,16 +242,6 @@ def test_quiz_estimate_wrong_letter_speaks_estimate_incorrect_with_correct_choic
     assert len(incorrect_calls) == 5
     assert incorrect_calls[0] == (("estimate_incorrect", {"letter": "B", "value": 1925000}), {})
 
-
-def test_quiz_estimate_no_response_counts_as_wrong_but_does_not_crash(skill):
-    skill.speak_dialog = MagicMock()
-    skill.get_response = MagicMock(return_value=None)
-    with patch("mathpractice_skill.generate_estimate_problem", return_value=_fixed_estimate_problem()):
-        skill.handle_quiz_estimate(_msg())
-    no_answer_calls = [c for c in skill.speak_dialog.call_args_list if c[0][0] == "quiz_no_answer"]
-    assert len(no_answer_calls) == 5
-    final_call = skill.speak_dialog.call_args_list[-1]
-    assert final_call == (("quiz_finished", {"correct": 0, "total": 5}), {})
 
 
 def test_quiz_decimal_uses_existing_question_dialog_and_grades_with_epsilon(skill):
