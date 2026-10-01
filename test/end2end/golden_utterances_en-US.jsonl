@@ -1,0 +1,33 @@
+{"utterance": "count to 7", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "count_to"}
+{"utterance": "quiz me on chained addition", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_chain"}
+{"utterance": "test me on chained subtraction", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_chain"}
+{"utterance": "quiz me on multiplication chains", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_chain"}
+{"utterance": "quiz me on decimal division", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_decimal"}
+{"utterance": "test me on decimal addition", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_decimal"}
+{"utterance": "quiz me on estimation", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_estimate"}
+{"utterance": "test me on estimation", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_estimate"}
+{"utterance": "quiz me on estimating", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_estimate"}
+{"utterance": "give me a full math quiz", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_full"}
+{"utterance": "quiz me on everything", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_full"}
+{"utterance": "give me a mixed math quiz", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_full"}
+{"utterance": "give me a math quiz", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_general"}
+{"utterance": "quiz me on math", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_general"}
+{"utterance": "give me a math problem", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_general"}
+{"utterance": "quiz me on mixed operators", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_mixed"}
+{"utterance": "test me on mixed operators", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_mixed"}
+{"utterance": "quiz me on order of operations", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_mixed"}
+{"utterance": "quiz me on subtraction", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation"}
+{"utterance": "test me on multiplication", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation"}
+{"utterance": "quiz me on (easy|medium|hard) division", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation_difficulty"}
+{"utterance": "test me on (easy|medium|hard) addition", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation_difficulty"}
+{"utterance": "quiz me on (easy|medium|hard) subtraction", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation_difficulty"}
+{"utterance": "quiz me on the 3 times table", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_table"}
+{"utterance": "test me on the 12 times table", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_table"}
+{"utterance": "quiz me on what you taught me", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_taught"}
+{"utterance": "quiz me on what I just learned", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_taught"}
+{"utterance": "say the 9 times table", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "recite_table"}
+{"utterance": "recite the 7 times table", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "recite_table"}
+{"utterance": "teach me the 3 times table", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me"}
+{"utterance": "teach me the 12 times tables", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me"}
+{"utterance": "teach me multiplication facts for 9", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me_operation"}
+{"utterance": "teach me the division facts for 7", "lang": "en-US", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me_operation"}
