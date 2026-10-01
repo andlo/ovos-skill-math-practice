@@ -1,0 +1,33 @@
+{"utterance": "tæl til 7", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "count_to"}
+{"utterance": "quiz mig i kædet addition", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_chain"}
+{"utterance": "test mig i kædet subtraktion", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_chain"}
+{"utterance": "quiz mig i decimaltal i multiplikation", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_decimal"}
+{"utterance": "quiz mig i kommatal i division", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_decimal"}
+{"utterance": "test mig i decimaltal i addition", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_decimal"}
+{"utterance": "quiz mig i estimering", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_estimate"}
+{"utterance": "test mig i estimering", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_estimate"}
+{"utterance": "quiz mig i overslagsregning", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_estimate"}
+{"utterance": "quiz mig i det hele", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_full"}
+{"utterance": "giv mig en stor mat quiz", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_full"}
+{"utterance": "giv mig en blandet regnequiz", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_full"}
+{"utterance": "giv mig en regnequiz", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_general"}
+{"utterance": "quiz mig i matematik", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_general"}
+{"utterance": "giv mig et regnestykke", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_general"}
+{"utterance": "quiz mig i blandede regnearter", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_mixed"}
+{"utterance": "test mig i blandede regnearter", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_mixed"}
+{"utterance": "quiz mig i regnehierarki", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_mixed"}
+{"utterance": "quiz mig i subtraktion", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation"}
+{"utterance": "test mig i multiplikation", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation"}
+{"utterance": "quiz mig i (nem|let|mellem|middel|svær|svaer) division", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation_difficulty"}
+{"utterance": "test mig i (nem|let|mellem|middel|svær|svaer) addition", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation_difficulty"}
+{"utterance": "quiz mig i (nem|let|mellem|middel|svær|svaer) subtraktion", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_operation_difficulty"}
+{"utterance": "quiz mig i 3 tabellen", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_table"}
+{"utterance": "test mig i 12 tabellen", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_table"}
+{"utterance": "quiz mig i det du laerte mig", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_taught"}
+{"utterance": "quiz mig i det jeg lige laerte", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "quiz_taught"}
+{"utterance": "sig 9 tabellen", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "recite_table"}
+{"utterance": "recitér 7 tabellen", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "recite_table"}
+{"utterance": "lær mig 3 tabellen", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me"}
+{"utterance": "lær mig 12 tabellerne", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me"}
+{"utterance": "lær mig multiplikation for 9", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me_operation"}
+{"utterance": "lær mig division facts for 7", "lang": "da-DK", "skill_id": "ovos-skill-math-practice.andlo", "intent_label": "teach_me_operation"}
