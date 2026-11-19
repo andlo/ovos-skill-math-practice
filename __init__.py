@@ -37,12 +37,13 @@ from pathlib import Path
 
 import functools
 import threading
+from fractions import Fraction
 
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_workshop.skills import OVOSSkill
 from ovos_workshop.decorators import intent_handler
-from ovos_number_parser import extract_number
+from numtag import Kind, Reason, UnsupportedLanguageError, tag_numbers
 
 NUM_QUIZ_QUESTIONS = 5
 COUNT_MAX = 100  # sanity cap for "count to X" - not a hard product limit, just avoids absurdly long recitations
@@ -128,8 +129,8 @@ DECIMAL_MULTIPLY_MIN, DECIMAL_MULTIPLY_MAX = 1, 12
 DECIMAL_DIVIDE_QUOTIENT_MIN, DECIMAL_DIVIDE_QUOTIENT_MAX = 1, 12
 DECIMAL_DIVIDE_DIVISOR_MIN, DECIMAL_DIVIDE_DIVISOR_MAX = 1, 10
 # Guards against float-representation quirks after two independent
-# float() conversions (the generated answer's, and extract_number()'s
-# parse of the spoken response) - NOT a pedagogical estimation
+# float() conversions (the generated answer's, and the float of the
+# spoken response) - NOT a pedagogical estimation
 # tolerance. Every decimal problem here is exact by construction.
 DECIMAL_GRADING_EPSILON = 0.01
 
@@ -146,6 +147,60 @@ OPERATIONS = ["add", "subtract", "multiply", "divide"]
 # untouched by additions here, so new operations don't retroactively
 # change what "give me a math quiz" means.
 ALL_OPERATIONS = OPERATIONS + ["percent"]
+
+
+_DANISH_TENS = {20, 30, 40, 50, 60, 70, 80, 90}
+
+
+def _spoken_numbers(text, lang):
+    """The values of the numbers in text, in reading order, as exact
+    Fractions - read by numtag, so digits in the language's own
+    notation ('2,5' in Danish) and spoken numbers ('femogtyve', 'two
+    and a half') both count.
+
+    A lone article ('en', 'et') is the number 1 only when the
+    text holds no other number: an answer of just 'en' is 1.
+
+    Danish: numtag reads 'fire og tyve' as 4 and 20, because the
+    written number is one word ('fireogtyve') and 'mellem to og
+    fyrre' really is two numbers (TigreGotico/numtag#253). A spoken
+    quiz answer has no such range, and STT may split the word, so a
+    unit, 'og' and a ten are joined back into one number here."""
+    if not text:
+        return []
+    try:
+        mentions = tag_numbers(str(text), lang)
+    except UnsupportedLanguageError:
+        return []
+    mentions = [m for m in mentions if Reason.ARTICLE not in m.reasons] or mentions
+    values = []
+    previous = None
+    for m in mentions:
+        value = Fraction(m.value)
+        if (previous is not None and lang.lower().startswith("da")
+                and previous.kind is Kind.CARDINAL and m.kind is Kind.CARDINAL
+                and Fraction(previous.value) in range(1, 10) and value in _DANISH_TENS
+                and text[previous.char_span[1]:m.char_span[0]].strip().casefold() == "og"):
+            values[-1] += value
+            previous = None
+            continue
+        values.append(value)
+        previous = m
+    return values
+
+
+def _read_number(text, lang):
+    """The first number in a slot ('the 7 times table'), or None."""
+    values = _spoken_numbers(text, lang)
+    return values[0] if values else None
+
+
+def _read_answer(text, lang):
+    """The number a spoken quiz answer gives, or None. The last one
+    wins, so a self-correction ('twelve, no, thirteen') counts as
+    thirteen."""
+    values = _spoken_numbers(text, lang)
+    return values[-1] if values else None
 
 
 def generate_problem(operation, table=None, difficulty="medium"):
@@ -722,8 +777,8 @@ class MathPractice(OVOSSkill):
         if response_text is None:
             self.speak_dialog("quiz_no_answer")
             return False
-        user_value = extract_number(response_text, lang=self.lang)
-        if user_value is not False and user_value == answer:
+        user_value = _read_answer(response_text, self.lang)
+        if user_value is not None and user_value == answer:
             self.speak_dialog("quiz_correct")
             return True
         self.speak_dialog("quiz_incorrect", {"answer": answer})
@@ -731,7 +786,7 @@ class MathPractice(OVOSSkill):
 
     def _grade_estimate_response(self, response_text, choices, correct_index):
         """Accepts either a spoken letter (voc-matched against
-        choice_a/b/c.voc) or the spoken number itself (extract_number,
+        choice_a/b/c.voc) or the spoken number itself (_read_answer,
         matched against the presented choice values) - a user reading
         the number back out loud instead of the letter should still
         count, even though the whole point of letters is to avoid
@@ -739,8 +794,8 @@ class MathPractice(OVOSSkill):
         for i, letter in enumerate(ESTIMATE_LETTERS):
             if self.voc_match(response_text, f"choice_{letter.lower()}"):
                 return i == correct_index
-        user_value = extract_number(response_text, lang=self.lang)
-        if user_value is not False and user_value in choices:
+        user_value = _read_answer(response_text, self.lang)
+        if user_value is not None and user_value in choices:
             return choices.index(user_value) == correct_index
         return False
 
@@ -774,8 +829,8 @@ class MathPractice(OVOSSkill):
         if response_text is None:
             self.speak_dialog("quiz_no_answer")
             return False
-        user_value = extract_number(response_text, lang=self.lang)
-        if user_value is not False and abs(user_value - answer) < DECIMAL_GRADING_EPSILON:
+        user_value = _read_answer(response_text, self.lang)
+        if user_value is not None and abs(user_value - answer) < DECIMAL_GRADING_EPSILON:
             self.speak_dialog("quiz_correct")
             return True
         self.speak_dialog("quiz_incorrect", {"answer": answer})
@@ -789,8 +844,8 @@ class MathPractice(OVOSSkill):
     @stoppable
     def handle_count_to(self, message):
         n_raw = message.data.get("number")
-        n = extract_number(n_raw, lang=self.lang) if n_raw else None
-        if n is False or n is None or n < 1:
+        n = _read_number(n_raw, self.lang)
+        if n is None or n < 1:
             self._speak_number_not_understood()
             return
         n = int(n)
@@ -822,8 +877,8 @@ class MathPractice(OVOSSkill):
     @stoppable
     def handle_recite_table(self, message):
         n_raw = message.data.get("number")
-        n = extract_number(n_raw, lang=self.lang) if n_raw else None
-        if n is False or n is None or n < 1:
+        n = _read_number(n_raw, self.lang)
+        if n is None or n < 1:
             self._speak_number_not_understood()
             return
         n = int(n)
@@ -848,8 +903,8 @@ class MathPractice(OVOSSkill):
         if response_text is None:
             self.speak_dialog("quiz_no_answer")
             return False
-        user_value = extract_number(response_text, lang=self.lang)
-        if user_value is not False and user_value == answer:
+        user_value = _read_answer(response_text, self.lang)
+        if user_value is not None and user_value == answer:
             self.speak_dialog("quiz_correct")
             return True
         self.speak_dialog("quiz_incorrect", {"answer": answer})
@@ -928,8 +983,8 @@ class MathPractice(OVOSSkill):
     @stoppable
     def handle_quiz_table(self, message):
         n_raw = message.data.get("number")
-        n = extract_number(n_raw, lang=self.lang) if n_raw else None
-        if n is False or n is None or n < 1:
+        n = _read_number(n_raw, self.lang)
+        if n is None or n < 1:
             self._speak_number_not_understood()
             return
         self._run_quiz("multiply", table=int(n))
@@ -1086,8 +1141,8 @@ class MathPractice(OVOSSkill):
     @stoppable
     def handle_teach_me(self, message):
         n_raw = message.data.get("number")
-        n = extract_number(n_raw, lang=self.lang) if n_raw else None
-        if n is False or n is None or n < 1:
+        n = _read_number(n_raw, self.lang)
+        if n is None or n < 1:
             self._speak_number_not_understood()
             return
         self._teach_facts_for_operation("multiply", int(n))
@@ -1101,8 +1156,8 @@ class MathPractice(OVOSSkill):
             self.speak_dialog("operation_not_understood", {"operation": operation_raw or ""})
             return
         n_raw = message.data.get("number")
-        n = extract_number(n_raw, lang=self.lang) if n_raw else None
-        if n is False or n is None or n < 1:
+        n = _read_number(n_raw, self.lang)
+        if n is None or n < 1:
             self._speak_number_not_understood()
             return
         self._teach_facts_for_operation(operation, int(n))

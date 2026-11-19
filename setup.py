@@ -71,7 +71,7 @@ setup(
     author="Andreas Lorensen",
     author_email="andlo@outlook.dk",
     license="GPL-3.0-or-later",
-    python_requires=">=3.9",
+    python_requires=">=3.11",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: End Users/Desktop",
